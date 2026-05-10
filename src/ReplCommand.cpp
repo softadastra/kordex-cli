@@ -1,0 +1,398 @@
+/**
+ *
+ *  @file ReplCommand.cpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2026, Gaspard Kirira.
+ *  All rights reserved.
+ *  https://github.com/kordexjs/cli
+ *
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the LICENSE file.
+ *
+ *  Kordex CLI
+ *
+ */
+
+#include <iostream>
+#include <sstream>
+#include <utility>
+
+#include <kordex/runtime/SourceFile.hpp>
+#include <kordex/cli/ReplCommand.hpp>
+
+namespace kordex::cli
+{
+  namespace
+  {
+    [[nodiscard]] bool is_flag(
+        const ::std::string &value) noexcept
+    {
+      return value.size() > 1 && value.front() == '-';
+    }
+
+    [[nodiscard]] ::std::string join_eval_args(
+        const ::std::vector<::std::string> &args,
+        ::std::size_t start)
+    {
+      ::std::ostringstream stream;
+
+      for (::std::size_t index = start; index < args.size(); ++index)
+      {
+        if (index > start)
+        {
+          stream << ' ';
+        }
+
+        stream << args[index];
+      }
+
+      return stream.str();
+    }
+
+    [[nodiscard]] ::std::string runtime_error_message(
+        const kordex::runtime::RuntimeResult &result)
+    {
+      if (!result.error_output.empty())
+      {
+        return result.error_output;
+      }
+
+      if (result.error.has_error())
+      {
+        return ::std::string(result.error.message());
+      }
+
+      return "runtime evaluation failed";
+    }
+
+    [[nodiscard]] Error map_runtime_error(
+        const kordex::runtime::RuntimeResult &result)
+    {
+      if (result.error.has_error())
+      {
+        return make_cli_error(
+            CliErrorCode::RuntimeError,
+            ::std::string(result.error.message()));
+      }
+
+      return make_cli_error(
+          CliErrorCode::RuntimeError,
+          "runtime evaluation failed");
+    }
+
+    [[nodiscard]] CliResult run_interactive_placeholder(
+        const ReplCommandOptions &options,
+        const CliConfig &config)
+    {
+      (void)options;
+      (void)config;
+
+      ::std::ostringstream stream;
+
+      stream << "Kordex REPL is not connected to a JavaScript engine yet.\n";
+      stream << "Use `kordex repl --eval \"console.log('hello')\"` "
+             << "to validate the CLI flow.";
+
+      return CliResult::success(stream.str());
+    }
+  } // namespace
+
+  bool ReplCommandOptions::has_eval() const noexcept
+  {
+    return !eval.empty();
+  }
+
+  Result<ReplCommandOptions> parse_repl_options(
+      const CommandContext &context)
+  {
+    ReplCommandOptions options;
+
+    options.debug = context.config.debug;
+    options.diagnostics = true;
+    options.interactive = context.config.interactive;
+
+    for (::std::size_t index = 0; index < context.args.size(); ++index)
+    {
+      const auto &arg = context.args[index];
+
+      if (arg.empty())
+      {
+        return make_cli_error(
+            CliErrorCode::InvalidArgument,
+            "repl arguments cannot contain empty entries");
+      }
+
+      if (arg == "--debug")
+      {
+        options.debug = true;
+        continue;
+      }
+
+      if (arg == "--no-diagnostics")
+      {
+        options.diagnostics = false;
+        continue;
+      }
+
+      if (arg == "--allow-net")
+      {
+        options.allow_net = true;
+        continue;
+      }
+
+      if (arg == "--allow-process")
+      {
+        options.allow_process = true;
+        continue;
+      }
+
+      if (arg == "--no-fs")
+      {
+        options.allow_fs = false;
+        continue;
+      }
+
+      if (arg == "--no-env")
+      {
+        options.allow_env = false;
+        continue;
+      }
+
+      if (arg == "--no-interactive")
+      {
+        options.interactive = false;
+        continue;
+      }
+
+      if (arg == "--eval" || arg == "-e")
+      {
+        if (index + 1 >= context.args.size())
+        {
+          return make_cli_error(
+              CliErrorCode::InvalidArgument,
+              "missing value for --eval");
+        }
+
+        options.eval = context.args[++index];
+        options.interactive = false;
+        continue;
+      }
+
+      if (arg == "--")
+      {
+        options.eval = join_eval_args(context.args, index + 1);
+        options.interactive = false;
+        break;
+      }
+
+      if (is_flag(arg))
+      {
+        return make_cli_error(
+            CliErrorCode::InvalidArgument,
+            "unknown repl option: " + arg);
+      }
+
+      if (!options.has_eval())
+      {
+        options.eval = arg;
+        options.interactive = false;
+        continue;
+      }
+
+      options.eval += ' ';
+      options.eval += arg;
+    }
+
+    const auto validation = validate_repl_options(options);
+    if (validation)
+    {
+      return validation;
+    }
+
+    return options;
+  }
+
+  Error validate_repl_options(
+      const ReplCommandOptions &options)
+  {
+    if (!options.interactive && options.eval.empty())
+    {
+      return make_cli_error(
+          CliErrorCode::InvalidArgument,
+          "repl command requires eval source when interactive mode is disabled");
+    }
+
+    if (!options.allow_fs)
+    {
+      return make_cli_error(
+          CliErrorCode::InvalidConfig,
+          "repl command requires filesystem access for runtime initialization");
+    }
+
+    return ok();
+  }
+
+  kordex::runtime::RuntimeOptions to_runtime_options(
+      const ReplCommandOptions &options,
+      const CliConfig &config)
+  {
+    auto runtime_options = config.debug || options.debug
+                               ? kordex::runtime::RuntimeOptions::development()
+                               : kordex::runtime::RuntimeOptions::defaults();
+
+    runtime_options.mode = kordex::runtime::RuntimeMode::Development;
+    runtime_options.permission_mode = kordex::runtime::PermissionMode::Relaxed;
+
+    runtime_options.working_directory = config.working_directory;
+
+    runtime_options.allow_fs = options.allow_fs;
+    runtime_options.allow_net = options.allow_net;
+    runtime_options.allow_process = options.allow_process;
+    runtime_options.allow_env = options.allow_env;
+
+    runtime_options.diagnostics = options.diagnostics;
+    runtime_options.debug = options.debug || config.debug;
+
+    return runtime_options;
+  }
+
+  CliResult run_repl_eval(
+      const ReplCommandOptions &options,
+      const CliConfig &config)
+  {
+    if (options.eval.empty())
+    {
+      return CliResult::failure(
+          make_cli_error(
+              CliErrorCode::InvalidArgument,
+              "eval source cannot be empty"),
+          1);
+    }
+
+    auto runtime_options = to_runtime_options(options, config);
+
+    auto runtime_result = kordex::runtime::Runtime::from_options(
+        runtime_options);
+
+    if (!runtime_result)
+    {
+      return CliResult::failure(
+          make_cli_error(
+              CliErrorCode::RuntimeError,
+              ::std::string(runtime_result.error().message())),
+          1);
+    }
+
+    auto runtime = ::std::move(runtime_result.value());
+
+    auto start_error = runtime.start();
+    if (start_error)
+    {
+      return CliResult::failure(
+          make_cli_error(
+              CliErrorCode::RuntimeError,
+              ::std::string(start_error.message())),
+          1);
+    }
+
+    auto source_result = kordex::runtime::SourceFile::from_content(
+        "<repl>",
+        options.eval);
+
+    if (!source_result)
+    {
+      (void)runtime.shutdown();
+
+      return CliResult::failure(
+          make_cli_error(
+              CliErrorCode::RuntimeError,
+              ::std::string(source_result.error().message())),
+          1);
+    }
+
+    auto result = runtime.run_source(::std::move(source_result.value()));
+
+    const auto shutdown_error = runtime.shutdown();
+
+    if (result.succeeded())
+    {
+      if (shutdown_error)
+      {
+        return CliResult::failure(
+            make_cli_error(
+                CliErrorCode::RuntimeError,
+                ::std::string(shutdown_error.message())),
+            1);
+      }
+
+      if (!result.output.empty())
+      {
+        return CliResult::success(result.output);
+      }
+
+      return CliResult::success("Evaluated REPL source");
+    }
+
+    CliResult cli_result = CliResult::failure(
+        map_runtime_error(result),
+        result.exit_code == 0 ? 1 : result.exit_code);
+
+    cli_result.error_output = runtime_error_message(result);
+
+    if (shutdown_error && cli_result.error_output.empty())
+    {
+      cli_result.error_output = ::std::string(shutdown_error.message());
+    }
+
+    return cli_result;
+  }
+
+  CliResult run_repl_command(
+      const CommandContext &context)
+  {
+    auto options = parse_repl_options(context);
+    if (!options)
+    {
+      return CliResult::failure(options.error(), 1);
+    }
+
+    if (context.config.dry_run)
+    {
+      if (options.value().has_eval())
+      {
+        return CliResult::success("Would evaluate REPL source");
+      }
+
+      return CliResult::success("Would start Kordex REPL");
+    }
+
+    if (options.value().has_eval())
+    {
+      return run_repl_eval(options.value(), context.config);
+    }
+
+    return run_interactive_placeholder(options.value(), context.config);
+  }
+
+  Result<Command> create_repl_command()
+  {
+    CommandInfo info;
+    info.name = "repl";
+    info.aliases = {};
+    info.summary = "Start an interactive Kordex session";
+    info.description =
+        "Start a Kordex REPL session or evaluate a source snippet with --eval.";
+    info.usage = "kordex repl [--eval <source>]";
+    info.hidden = false;
+    info.enabled = true;
+
+    return Command::create(
+        ::std::move(info),
+        [](const CommandContext &context) -> CliResult
+        {
+          return run_repl_command(context);
+        });
+  }
+
+} // namespace kordex::cli
