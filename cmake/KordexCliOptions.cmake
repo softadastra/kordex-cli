@@ -22,6 +22,13 @@ option(KORDEX_CLI_BUILD_TESTS "Build Kordex CLI tests" OFF)
 option(KORDEX_CLI_BUILD_EXAMPLES "Build Kordex CLI examples" OFF)
 
 # --------------------------------------------------------------------
+# Install options
+# --------------------------------------------------------------------
+option(KORDEX_CLI_ENABLE_INSTALL
+    "Generate install/export rules for Kordex CLI"
+    OFF)
+
+# --------------------------------------------------------------------
 # Developer options
 # --------------------------------------------------------------------
 option(KORDEX_CLI_ENABLE_WARNINGS "Enable compiler warnings for Kordex CLI" ON)

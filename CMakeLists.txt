@@ -52,12 +52,24 @@ function(kordex_cli_require_target target_name package_name sibling_dir fetch_op
         "[cli] Umbrella build requires target '${target_name}' to be provided by the root project.")
   endif()
 
-  if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../${sibling_dir}/CMakeLists.txt")
-    message(STATUS "[cli] Adding ${target_name} from sibling: ../${sibling_dir}")
+  set(local_kordex_dep
+      "${CMAKE_CURRENT_LIST_DIR}/../${sibling_dir}")
+
+  set(local_vix_dep
+      "${CMAKE_CURRENT_LIST_DIR}/../../deps/vix/${sibling_dir}")
+
+  if(EXISTS "${local_kordex_dep}/CMakeLists.txt")
+    message(STATUS "[cli] Adding ${target_name} from Kordex sibling: ${local_kordex_dep}")
 
     add_subdirectory(
-        "${CMAKE_CURRENT_LIST_DIR}/../${sibling_dir}"
+        "${local_kordex_dep}"
         "${CMAKE_CURRENT_BINARY_DIR}/_deps/${sibling_dir}")
+  elseif(EXISTS "${local_vix_dep}/CMakeLists.txt")
+    message(STATUS "[cli] Adding ${target_name} from umbrella Vix dependency: ${local_vix_dep}")
+
+    add_subdirectory(
+        "${local_vix_dep}"
+        "${CMAKE_CURRENT_BINARY_DIR}/_deps/vix_${sibling_dir}")
   else()
     find_package(${package_name} CONFIG QUIET)
   endif()
@@ -84,6 +96,7 @@ function(kordex_cli_require_target target_name package_name sibling_dir fetch_op
     message(FATAL_ERROR
         "[cli] Required dependency target '${target_name}' was not found.\n"
         "Install package '${package_name}', provide sibling '../${sibling_dir}', "
+        "provide umbrella dependency '../../deps/vix/${sibling_dir}', "
         "or enable ${fetch_option}.")
   endif()
 endfunction()
@@ -315,9 +328,11 @@ if(KORDEX_CLI_BUILD_APP)
       PRIVATE
         cxx_std_20)
 
-  install(
-      TARGETS kordex
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  if(KORDEX_CLI_ENABLE_INSTALL)
+    install(
+        TARGETS kordex
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif()
 
 # --------------------------------------------------------------------
@@ -398,7 +413,8 @@ endif()
 # --------------------------------------------------------------------
 # Install
 # --------------------------------------------------------------------
-if(NOT (DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD))
+if(KORDEX_CLI_ENABLE_INSTALL
+   AND NOT (DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD))
 
   install(
       TARGETS kordex_cli
@@ -458,6 +474,7 @@ message(STATUS "  tests          : ${KORDEX_CLI_BUILD_TESTS}")
 message(STATUS "  examples       : ${KORDEX_CLI_BUILD_EXAMPLES}")
 message(STATUS "  warnings       : ${KORDEX_CLI_ENABLE_WARNINGS}")
 message(STATUS "  sanitizers     : ${KORDEX_CLI_ENABLE_SANITIZERS}")
+message(STATUS "  install        : ${KORDEX_CLI_ENABLE_INSTALL}")
 message(STATUS "  init command   : ${KORDEX_CLI_ENABLE_INIT_COMMAND}")
 message(STATUS "  run command    : ${KORDEX_CLI_ENABLE_RUN_COMMAND}")
 message(STATUS "  check command  : ${KORDEX_CLI_ENABLE_CHECK_COMMAND}")
