@@ -14,6 +14,7 @@
  *
  */
 
+#include <iostream>
 #include <sstream>
 #include <string_view>
 #include <vector>
@@ -28,7 +29,10 @@ namespace
   {
     if (!condition)
     {
-      (void)message;
+      ::std::cerr << "[test_cli] failed: "
+                  << (message ? message : "unknown assertion")
+                  << '\n';
+
       return false;
     }
 
@@ -819,38 +823,54 @@ namespace
 
 } // namespace
 
+[[nodiscard]] bool run_test(
+    const char *name,
+    bool (*test)())
+{
+  if (!test())
+  {
+    ::std::cerr << "[test_cli] failed test: "
+                << (name ? name : "unknown")
+                << '\n';
+
+    return false;
+  }
+
+  return true;
+}
+
 int main()
 {
   const bool ok =
-      test_run_options_helpers() &&
-      test_create_default_cli() &&
-      test_default_constructor() &&
-      test_construct_from_options() &&
-      test_construct_from_config_and_registry() &&
-      test_from_args() &&
-      test_from_args_invalid() &&
-      test_register_command() &&
-      test_register_duplicate_command_fails() &&
-      test_run_version_command() &&
-      test_run_version_short_flag() &&
-      test_run_help_command() &&
-      test_run_help_short_flag() &&
-      test_run_without_args_defaults_to_help() &&
-      test_run_unknown_command() &&
-      test_run_command_direct() &&
-      test_run_command_alias_direct() &&
-      test_run_with_streams_success() &&
-      test_run_with_streams_failure() &&
-      test_run_argc_argv() &&
-      test_run_argc_argv_streams() &&
-      test_help_top_level() &&
-      test_help_command() &&
-      test_help_unknown_command() &&
-      test_version_text() &&
-      test_create_invalid_options() &&
-      test_validate_without_commands_fails() &&
-      test_run_cli_helper_success() &&
-      test_run_cli_helper_invalid_args();
+      run_test("test_run_options_helpers", test_run_options_helpers) &&
+      run_test("test_create_default_cli", test_create_default_cli) &&
+      run_test("test_default_constructor", test_default_constructor) &&
+      run_test("test_construct_from_options", test_construct_from_options) &&
+      run_test("test_construct_from_config_and_registry", test_construct_from_config_and_registry) &&
+      run_test("test_from_args", test_from_args) &&
+      run_test("test_from_args_invalid", test_from_args_invalid) &&
+      run_test("test_register_command", test_register_command) &&
+      run_test("test_register_duplicate_command_fails", test_register_duplicate_command_fails) &&
+      run_test("test_run_version_command", test_run_version_command) &&
+      run_test("test_run_version_short_flag", test_run_version_short_flag) &&
+      run_test("test_run_help_command", test_run_help_command) &&
+      run_test("test_run_help_short_flag", test_run_help_short_flag) &&
+      run_test("test_run_without_args_defaults_to_help", test_run_without_args_defaults_to_help) &&
+      run_test("test_run_unknown_command", test_run_unknown_command) &&
+      run_test("test_run_command_direct", test_run_command_direct) &&
+      run_test("test_run_command_alias_direct", test_run_command_alias_direct) &&
+      run_test("test_run_with_streams_success", test_run_with_streams_success) &&
+      run_test("test_run_with_streams_failure", test_run_with_streams_failure) &&
+      run_test("test_run_argc_argv", test_run_argc_argv) &&
+      run_test("test_run_argc_argv_streams", test_run_argc_argv_streams) &&
+      run_test("test_help_top_level", test_help_top_level) &&
+      run_test("test_help_command", test_help_command) &&
+      run_test("test_help_unknown_command", test_help_unknown_command) &&
+      run_test("test_version_text", test_version_text) &&
+      run_test("test_create_invalid_options", test_create_invalid_options) &&
+      run_test("test_validate_without_commands_fails", test_validate_without_commands_fails) &&
+      run_test("test_run_cli_helper_success", test_run_cli_helper_success) &&
+      run_test("test_run_cli_helper_invalid_args", test_run_cli_helper_invalid_args);
 
   return ok ? 0 : 1;
 }

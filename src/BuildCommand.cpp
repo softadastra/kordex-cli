@@ -185,6 +185,11 @@ namespace kordex::cli
       return stream.str();
     }
 
+    [[nodiscard]] Error write_text_file(
+        const ::std::filesystem::path &path,
+        const ::std::string &content,
+        bool force);
+
     [[nodiscard]] Error write_source_map_file(
         const BuildReport &report,
         const ::std::filesystem::path &output_path,

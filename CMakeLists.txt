@@ -221,6 +221,11 @@ set(KORDEX_CLI_HEADERS
     include/kordex/cli/HelpFormatter.hpp
     include/kordex/cli/Output.hpp
     include/kordex/cli/Commands.hpp
+    include/kordex/cli/ProjectDiscovery.hpp
+    include/kordex/cli/InstallCommand.hpp
+    include/kordex/cli/UpdateCommand.hpp
+    include/kordex/cli/PermissionBridge.hpp
+    include/kordex/cli/PluginCommandRegistry.hpp
     include/kordex/cli/InitCommand.hpp
     include/kordex/cli/RunCommand.hpp
     include/kordex/cli/CheckCommand.hpp
@@ -241,6 +246,11 @@ set(KORDEX_CLI_SOURCES
     src/HelpFormatter.cpp
     src/Output.cpp
     src/Commands.cpp
+    src/ProjectDiscovery.cpp
+    src/InstallCommand.cpp
+    src/UpdateCommand.cpp
+    src/PermissionBridge.cpp
+    src/PluginCommandRegistry.cpp
     src/InitCommand.cpp
     src/RunCommand.cpp
     src/CheckCommand.cpp
@@ -355,59 +365,14 @@ if(KORDEX_CLI_BUILD_TESTS)
   include(CTest)
   enable_testing()
 
-  set(KORDEX_CLI_TESTS
-      test_version
-      test_error
-      test_cli_options
-      test_cli_config
-      test_cli_result
-      test_command
-      test_command_registry
-      test_argument_parser
-      test_help_formatter
-      test_output
-      test_cli)
-
-  foreach(test_name IN LISTS KORDEX_CLI_TESTS)
-    set(test_source "${CMAKE_CURRENT_SOURCE_DIR}/tests/${test_name}.cpp")
-
-    if(EXISTS "${test_source}")
-      add_executable(${test_name}
-          "${test_source}")
-
-      target_link_libraries(${test_name}
-          PRIVATE
-            kordex::cli
-            vix::tests)
-
-      add_test(
-          NAME ${test_name}
-          COMMAND ${test_name})
-    endif()
-  endforeach()
+  add_subdirectory(tests)
 endif()
 
 # --------------------------------------------------------------------
 # Examples
 # --------------------------------------------------------------------
 if(KORDEX_CLI_BUILD_EXAMPLES)
-  set(KORDEX_CLI_EXAMPLES
-      parse_args
-      register_command
-      run_cli)
-
-  foreach(example_name IN LISTS KORDEX_CLI_EXAMPLES)
-    set(example_source "${CMAKE_CURRENT_SOURCE_DIR}/examples/${example_name}.cpp")
-
-    if(EXISTS "${example_source}")
-      add_executable(kordex_cli_${example_name}
-          "${example_source}")
-
-      target_link_libraries(kordex_cli_${example_name}
-          PRIVATE
-            kordex::cli)
-    endif()
-  endforeach()
+  add_subdirectory(examples)
 endif()
 
 # --------------------------------------------------------------------

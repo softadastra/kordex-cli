@@ -250,7 +250,9 @@ namespace kordex::cli
         continue;
       }
 
-      if (!stop_option_parsing && is_option(token))
+      if (!stop_option_parsing &&
+          !parsed.has_command() &&
+          is_option(token))
       {
         if (token == "--help" || token == "-h")
         {

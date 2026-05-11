@@ -270,10 +270,20 @@ namespace kordex::cli
       return CliResult::failure(validation, 1);
     }
 
-    return registry_.run(
-        name,
-        config_,
-        ::std::move(args));
+    auto command = registry_.find(name);
+    if (!command)
+    {
+      return CliResult::failure(
+          command.error(),
+          1);
+    }
+
+    CommandContext context;
+    context.command_name = name;
+    context.args = ::std::move(args);
+    context.config = config_;
+
+    return command.value().run(context);
   }
 
   Result<::std::string> Cli::help() const

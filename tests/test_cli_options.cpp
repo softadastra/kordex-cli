@@ -111,6 +111,8 @@ namespace
                    options.enable_check &&
                    options.enable_build &&
                    options.enable_repl &&
+                   options.enable_install &&
+                   options.enable_update &&
                    options.enable_version,
                "development should enable commands");
   }
@@ -223,6 +225,8 @@ namespace
     options.enable_check = false;
     options.enable_build = false;
     options.enable_repl = false;
+    options.enable_install = false;
+    options.enable_update = false;
     options.enable_version = false;
 
     const bool disabled_state =

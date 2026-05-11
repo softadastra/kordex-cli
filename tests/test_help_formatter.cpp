@@ -126,8 +126,11 @@ namespace
 
   [[nodiscard]] bool test_formatter_from_config()
   {
+    auto cli_options = kordex::cli::CliOptions::test();
+    cli_options.debug = false;
+
     auto config_result = kordex::cli::CliConfig::from_options(
-        kordex::cli::CliOptions::test());
+        cli_options);
 
     if (!expect_true(
             result_ok(config_result),
@@ -144,10 +147,33 @@ namespace
                "formatter executable name should come from config") &&
            expect_true(
                !formatter.options().show_hidden,
-               "formatter should not show hidden without debug false") &&
+               "formatter should not show hidden when debug is false") &&
            expect_true(
                formatter.options().show_aliases,
                "formatter should preserve alias setting");
+  }
+
+  [[nodiscard]] bool test_formatter_from_debug_config_shows_hidden()
+  {
+    auto cli_options = kordex::cli::CliOptions::test();
+    cli_options.debug = true;
+
+    auto config_result = kordex::cli::CliConfig::from_options(
+        cli_options);
+
+    if (!expect_true(
+            result_ok(config_result),
+            "debug config should be valid"))
+    {
+      return false;
+    }
+
+    auto formatter = kordex::cli::HelpFormatter::from_config(
+        config_result.value());
+
+    return expect_true(
+        formatter.options().show_hidden,
+        "formatter should show hidden commands when debug is true");
   }
 
   [[nodiscard]] bool test_format_usage()
@@ -452,6 +478,7 @@ int main()
       test_options_helpers() &&
       test_default_formatter() &&
       test_formatter_from_config() &&
+      test_formatter_from_debug_config_shows_hidden() &&
       test_format_usage() &&
       test_format_command_usage() &&
       test_format_aliases() &&
