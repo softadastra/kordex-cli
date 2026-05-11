@@ -24,10 +24,8 @@
 #include <kordex/bindings/Engine.hpp>
 #include <kordex/bindings/Script.hpp>
 #include <kordex/bindings/ScriptResult.hpp>
-#include <kordex/std/Std.hpp>
-#include <kordex/std/StdOptions.hpp>
-
 #include <kordex/cli/RunCommand.hpp>
+#include <kordex/cli/PermissionBridge.hpp>
 
 namespace kordex::cli
 {
@@ -189,19 +187,23 @@ namespace kordex::cli
             init_result.exit_code == 0 ? 1 : init_result.exit_code);
       }
 
-      kordex::standard::StdOptions std_options =
-          config.debug || options.debug
-              ? kordex::standard::StdOptions::development()
-              : kordex::standard::StdOptions::production();
+      const auto runtime_options = to_runtime_options(
+          options,
+          config);
 
-      std_options.enable_fs = options.allow_fs;
-      std_options.enable_env = options.allow_env;
-      std_options.enable_process = options.allow_process;
-      std_options.enable_http = options.allow_net;
-
-      const auto std_error = kordex::standard::install(
+      const auto std_error = install_std_modules_for_runtime(
           engine,
-          std_options);
+          runtime_options);
+
+      if (std_error)
+      {
+        const auto shutdown_result = engine.shutdown();
+        (void)shutdown_result;
+
+        return CliResult::failure(
+            std_error,
+            1);
+      }
 
       if (std_error)
       {
@@ -330,6 +332,29 @@ namespace kordex::cli
         options.allow_env = false;
         continue;
       }
+      if (arg == "--allow-fs")
+      {
+        options.allow_fs = true;
+        continue;
+      }
+
+      if (arg == "--allow-env")
+      {
+        options.allow_env = true;
+        continue;
+      }
+
+      if (arg == "--allow-net")
+      {
+        options.allow_net = true;
+        continue;
+      }
+
+      if (arg == "--allow-process")
+      {
+        options.allow_process = true;
+        continue;
+      }
 
       if (is_flag(arg) && !options.has_file())
       {
@@ -371,13 +396,6 @@ namespace kordex::cli
       return make_cli_error(
           CliErrorCode::InvalidArgument,
           "run source file cannot be an option");
-    }
-
-    if (!options.allow_fs)
-    {
-      return make_cli_error(
-          CliErrorCode::InvalidConfig,
-          "run command requires filesystem access to load the source file");
     }
 
     return ok();

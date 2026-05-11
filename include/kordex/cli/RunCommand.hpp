@@ -59,7 +59,7 @@ namespace kordex::cli
     /**
      * @brief Whether filesystem access is allowed.
      */
-    bool allow_fs{true};
+    bool allow_fs{false};
 
     /**
      * @brief Whether network access is allowed.
@@ -74,7 +74,7 @@ namespace kordex::cli
     /**
      * @brief Whether environment access is allowed.
      */
-    bool allow_env{true};
+    bool allow_env{false};
 
     /**
      * @brief Return true if a source file was provided.

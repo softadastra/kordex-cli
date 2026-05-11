@@ -23,9 +23,7 @@
 #include <kordex/bindings/Bindings.hpp>
 #include <kordex/bindings/Engine.hpp>
 #include <kordex/bindings/ScriptResult.hpp>
-#include <kordex/std/Std.hpp>
-#include <kordex/std/StdOptions.hpp>
-
+#include <kordex/cli/PermissionBridge.hpp>
 #include <kordex/cli/ReplCommand.hpp>
 
 namespace kordex::cli
@@ -213,6 +211,29 @@ namespace kordex::cli
         options.interactive = false;
         continue;
       }
+      if (arg == "--allow-fs")
+      {
+        options.allow_fs = true;
+        continue;
+      }
+
+      if (arg == "--allow-env")
+      {
+        options.allow_env = true;
+        continue;
+      }
+
+      if (arg == "--allow-net")
+      {
+        options.allow_net = true;
+        continue;
+      }
+
+      if (arg == "--allow-process")
+      {
+        options.allow_process = true;
+        continue;
+      }
 
       if (arg == "--eval" || arg == "-e")
       {
@@ -336,19 +357,23 @@ namespace kordex::cli
           init_result.exit_code == 0 ? 1 : init_result.exit_code);
     }
 
-    kordex::standard::StdOptions std_options =
-        config.debug || options.debug
-            ? kordex::standard::StdOptions::development()
-            : kordex::standard::StdOptions::production();
+    const auto runtime_options = to_runtime_options(
+        options,
+        config);
 
-    std_options.enable_fs = options.allow_fs;
-    std_options.enable_env = options.allow_env;
-    std_options.enable_process = options.allow_process;
-    std_options.enable_http = options.allow_net;
-
-    const auto std_error = kordex::standard::install(
+    const auto std_error = install_std_modules_for_runtime(
         engine,
-        std_options);
+        runtime_options);
+
+    if (std_error)
+    {
+      const auto shutdown_result = engine.shutdown();
+      (void)shutdown_result;
+
+      return CliResult::failure(
+          std_error,
+          1);
+    }
 
     if (std_error)
     {
