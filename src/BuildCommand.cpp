@@ -27,12 +27,10 @@
 #include <kordex/bindings/EngineContext.hpp>
 #include <kordex/bindings/ModuleLoader.hpp>
 #include <kordex/bindings/Script.hpp>
-
 #include <kordex/runtime/SourceFile.hpp>
-
 #include <kordex/std/Std.hpp>
 #include <kordex/std/StdOptions.hpp>
-
+#include <kordex/cli/ProjectDiscovery.hpp>
 #include <kordex/cli/BuildCommand.hpp>
 
 namespace kordex::cli
@@ -294,70 +292,13 @@ namespace kordex::cli
     [[nodiscard]] Result<::std::string> resolve_project_entry(
         const ::std::filesystem::path &project_dir)
     {
-      const auto kordex_json = project_dir / "kordex.json";
-      if (::std::filesystem::exists(kordex_json))
-      {
-        const auto content = read_text_file(kordex_json);
-        const auto entry = extract_json_string(content, "entry");
+      ProjectDiscoveryOptions discovery_options;
+      discovery_options.start_directory = project_dir.string();
+      discovery_options.search_parents = false;
 
-        if (!entry.empty())
-        {
-          return (::std::filesystem::path(project_dir) / entry)
-              .lexically_normal()
-              .string();
-        }
-      }
+      ProjectDiscovery discovery(discovery_options);
 
-      const auto package_json = project_dir / "package.json";
-      if (::std::filesystem::exists(package_json))
-      {
-        const auto content = read_text_file(package_json);
-
-        ::std::string entry = extract_json_string(content, "kordex");
-        if (!entry.empty())
-        {
-          return (::std::filesystem::path(project_dir) / entry)
-              .lexically_normal()
-              .string();
-        }
-
-        entry = extract_json_string(content, "module");
-        if (!entry.empty())
-        {
-          return (::std::filesystem::path(project_dir) / entry)
-              .lexically_normal()
-              .string();
-        }
-
-        entry = extract_json_string(content, "main");
-        if (!entry.empty())
-        {
-          return (::std::filesystem::path(project_dir) / entry)
-              .lexically_normal()
-              .string();
-        }
-      }
-
-      const ::std::vector<::std::filesystem::path> candidates = {
-          project_dir / "src" / "main.ts",
-          project_dir / "src" / "main.js",
-          project_dir / "main.ts",
-          project_dir / "main.js",
-          project_dir / "index.ts",
-          project_dir / "index.js"};
-
-      for (const auto &candidate : candidates)
-      {
-        if (::std::filesystem::exists(candidate) &&
-            ::std::filesystem::is_regular_file(candidate))
-        {
-          return candidate.lexically_normal().string();
-        }
-      }
-
-      return make_cli_error(
-          CliErrorCode::IoError,
-          "could not find project entry in: " + project_dir.string());
+      return discovery.resolve_entry();
     }
 
     [[nodiscard]] Result<::std::string> resolve_entry(

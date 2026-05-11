@@ -26,6 +26,7 @@
 #include <kordex/bindings/ScriptResult.hpp>
 #include <kordex/cli/RunCommand.hpp>
 #include <kordex/cli/PermissionBridge.hpp>
+#include <kordex/cli/ProjectDiscovery.hpp>
 
 namespace kordex::cli
 {
@@ -96,6 +97,21 @@ namespace kordex::cli
           kordex::bindings::to_string(binding_options.backend);
 
       return binding_options;
+    }
+
+    [[nodiscard]] Result<::std::string> resolve_project_script(
+        const ::std::string &name,
+        const CliConfig &config)
+    {
+      ProjectDiscoveryOptions discovery_options;
+      discovery_options.start_directory =
+          config.working_directory.empty()
+              ? "."
+              : config.working_directory;
+
+      ProjectDiscovery discovery(discovery_options);
+
+      return discovery.resolve_script(name);
     }
 
     [[nodiscard]] ::std::string format_script_success(
@@ -386,9 +402,7 @@ namespace kordex::cli
   {
     if (options.file.empty())
     {
-      return make_cli_error(
-          CliErrorCode::InvalidArgument,
-          "run command requires a source file");
+      return ok();
     }
 
     if (is_flag(options.file))
@@ -448,14 +462,52 @@ namespace kordex::cli
       return CliResult::success(stream.str());
     }
 
-    const auto file_error = ensure_file_exists(options.value().file);
+    auto run_options = options.value();
+
+    if (!run_options.file.empty() &&
+        !std::filesystem::exists(run_options.file))
+    {
+      auto script = resolve_project_script(
+          run_options.file,
+          context.config);
+
+      if (script)
+      {
+        return CliResult::success(
+            "Resolved project script `" +
+            run_options.file +
+            "`: " +
+            script.value());
+      }
+    }
+
+    if (run_options.file.empty())
+    {
+      ProjectDiscoveryOptions discovery_options;
+      discovery_options.start_directory =
+          context.config.working_directory.empty()
+              ? "."
+              : context.config.working_directory;
+
+      ProjectDiscovery discovery(discovery_options);
+
+      auto entry = discovery.resolve_entry();
+      if (!entry)
+      {
+        return CliResult::failure(entry.error(), 1);
+      }
+
+      run_options.file = entry.value();
+    }
+
+    const auto file_error = ensure_file_exists(run_options.file);
     if (file_error)
     {
       return CliResult::failure(file_error, 1);
     }
 
     return run_script_with_engine(
-        options.value(),
+        run_options,
         context.config);
   }
 
