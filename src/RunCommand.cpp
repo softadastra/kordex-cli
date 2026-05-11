@@ -1,4 +1,3 @@
-
 /**
  *
  *  @file RunCommand.cpp
@@ -17,7 +16,14 @@
 
 #include <filesystem>
 #include <sstream>
+#include <string>
 #include <utility>
+
+#include <kordex/bindings/BindingOptions.hpp>
+#include <kordex/bindings/Bindings.hpp>
+#include <kordex/bindings/Engine.hpp>
+#include <kordex/bindings/Script.hpp>
+#include <kordex/bindings/ScriptResult.hpp>
 
 #include <kordex/cli/RunCommand.hpp>
 
@@ -66,13 +72,44 @@ namespace kordex::cli
       return ok();
     }
 
-    [[nodiscard]] ::std::string format_runtime_success(
+    [[nodiscard]] kordex::bindings::BindingOptions to_binding_options(
+        const RunCommandOptions &options,
+        const CliConfig &config)
+    {
+      auto binding_options = options.debug || config.debug
+                                 ? kordex::bindings::BindingOptions::development()
+                                 : kordex::bindings::BindingOptions::defaults();
+
+      binding_options.backend = kordex::bindings::default_backend();
+      binding_options.module_policy = kordex::bindings::ModulePolicy::Full;
+
+      binding_options.allow_native_modules = true;
+      binding_options.allow_native_functions = true;
+      binding_options.allow_runtime_bridge = true;
+
+      binding_options.diagnostics = options.diagnostics;
+      binding_options.debug = options.debug || config.debug;
+      binding_options.source_maps = false;
+
+      binding_options.engine_name =
+          ::std::string("kordex-run-") +
+          kordex::bindings::to_string(binding_options.backend);
+
+      return binding_options;
+    }
+
+    [[nodiscard]] ::std::string format_script_success(
         const ::std::string &file,
-        const kordex::runtime::RuntimeResult &result)
+        const kordex::bindings::ScriptResult &result)
     {
       if (!result.output.empty())
       {
         return result.output;
+      }
+
+      if (result.has_value())
+      {
+        return result.value.display();
       }
 
       ::std::ostringstream stream;
@@ -81,8 +118,8 @@ namespace kordex::cli
       return stream.str();
     }
 
-    [[nodiscard]] ::std::string format_runtime_failure(
-        const kordex::runtime::RuntimeResult &result)
+    [[nodiscard]] ::std::string format_script_failure(
+        const kordex::bindings::ScriptResult &result)
     {
       if (!result.error_output.empty())
       {
@@ -94,22 +131,97 @@ namespace kordex::cli
         return ::std::string(result.error.message());
       }
 
-      return "runtime execution failed";
+      return "script execution failed";
     }
 
-    [[nodiscard]] Error map_runtime_error(
-        const kordex::runtime::RuntimeResult &result)
+    [[nodiscard]] Error map_binding_error(
+        const kordex::bindings::ScriptResult &result)
     {
       if (result.error.has_error())
       {
         return make_cli_error(
-            CliErrorCode::RuntimeError,
+            CliErrorCode::BindingError,
             ::std::string(result.error.message()));
       }
 
       return make_cli_error(
-          CliErrorCode::RuntimeError,
-          "runtime execution failed");
+          CliErrorCode::BindingError,
+          "bindings script execution failed");
+    }
+
+    [[nodiscard]] CliResult run_script_with_engine(
+        const RunCommandOptions &options,
+        const CliConfig &config)
+    {
+      auto script = kordex::bindings::Script::load(options.file);
+      if (!script)
+      {
+        return CliResult::failure(
+            make_cli_error(
+                CliErrorCode::BindingError,
+                ::std::string(script.error().message())),
+            1);
+      }
+
+      auto engine_result = kordex::bindings::Engine::create(
+          to_binding_options(options, config));
+
+      if (!engine_result)
+      {
+        return CliResult::failure(
+            make_cli_error(
+                CliErrorCode::BindingError,
+                ::std::string(engine_result.error().message())),
+            1);
+      }
+
+      auto engine = ::std::move(engine_result.value());
+
+      auto init_result = engine.initialize();
+      if (!init_result.succeeded())
+      {
+        return CliResult::failure(
+            make_cli_error(
+                CliErrorCode::BindingError,
+                ::std::string(init_result.error.message())),
+            init_result.exit_code == 0 ? 1 : init_result.exit_code);
+      }
+
+      auto result = engine.run_script(script.value());
+
+      const auto shutdown_result = engine.shutdown();
+
+      if (result.succeeded())
+      {
+        auto output = format_script_success(
+            options.file,
+            result);
+
+        if (!shutdown_result.succeeded())
+        {
+          return CliResult::failure(
+              make_cli_error(
+                  CliErrorCode::BindingError,
+                  ::std::string(shutdown_result.error.message())),
+              shutdown_result.exit_code == 0 ? 1 : shutdown_result.exit_code);
+        }
+
+        return CliResult::success(output);
+      }
+
+      CliResult cli_result = CliResult::failure(
+          map_binding_error(result),
+          result.exit_code == 0 ? 1 : result.exit_code);
+
+      cli_result.error_output = format_script_failure(result);
+
+      if (!shutdown_result.succeeded() && cli_result.error_output.empty())
+      {
+        cli_result.error_output =
+            ::std::string(shutdown_result.error.message());
+      }
+
+      return cli_result;
     }
   } // namespace
 
@@ -251,10 +363,7 @@ namespace kordex::cli
                                ? kordex::runtime::RuntimeOptions::development()
                                : kordex::runtime::RuntimeOptions::defaults();
 
-    runtime_options.mode = config.debug
-                               ? kordex::runtime::RuntimeMode::Development
-                               : kordex::runtime::RuntimeMode::Development;
-
+    runtime_options.mode = kordex::runtime::RuntimeMode::Development;
     runtime_options.permission_mode = kordex::runtime::PermissionMode::Relaxed;
 
     runtime_options.working_directory = config.working_directory;
@@ -299,68 +408,9 @@ namespace kordex::cli
       return CliResult::failure(file_error, 1);
     }
 
-    auto runtime_options = to_runtime_options(
+    return run_script_with_engine(
         options.value(),
         context.config);
-
-    auto runtime_result = kordex::runtime::Runtime::from_options(
-        runtime_options);
-
-    if (!runtime_result)
-    {
-      return CliResult::failure(
-          make_cli_error(
-              CliErrorCode::RuntimeError,
-              ::std::string(runtime_result.error().message())),
-          1);
-    }
-
-    auto runtime = ::std::move(runtime_result.value());
-
-    auto start_error = runtime.start();
-    if (start_error)
-    {
-      return CliResult::failure(
-          make_cli_error(
-              CliErrorCode::RuntimeError,
-              ::std::string(start_error.message())),
-          1);
-    }
-
-    auto result = runtime.run_file(options.value().file);
-
-    const auto shutdown_error = runtime.shutdown();
-
-    if (result.succeeded())
-    {
-      auto output = format_runtime_success(
-          options.value().file,
-          result);
-
-      if (shutdown_error)
-      {
-        return CliResult::failure(
-            make_cli_error(
-                CliErrorCode::RuntimeError,
-                ::std::string(shutdown_error.message())),
-            1);
-      }
-
-      return CliResult::success(output);
-    }
-
-    CliResult cli_result = CliResult::failure(
-        map_runtime_error(result),
-        result.exit_code == 0 ? 1 : result.exit_code);
-
-    cli_result.error_output = format_runtime_failure(result);
-
-    if (shutdown_error && cli_result.error_output.empty())
-    {
-      cli_result.error_output = ::std::string(shutdown_error.message());
-    }
-
-    return cli_result;
   }
 
   Result<Command> create_run_command()
@@ -370,7 +420,7 @@ namespace kordex::cli
     info.aliases = {};
     info.summary = "Run a JavaScript or TypeScript file";
     info.description =
-        "Run a JavaScript or TypeScript source file through the Kordex runtime.";
+        "Run a JavaScript or TypeScript source file through the Kordex bindings engine.";
     info.usage = "kordex run <file> [--] [args]";
     info.hidden = false;
     info.enabled = true;
