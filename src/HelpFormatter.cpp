@@ -289,8 +289,14 @@ namespace kordex::cli
     stream << "Examples:\n";
     stream << "  " << options_.executable_name << " init app\n";
     stream << "  " << options_.executable_name << " run main.js\n";
+    stream << "  " << options_.executable_name << " run\n";
+    stream << "  " << options_.executable_name << " repl --eval \"1 + 2\"\n";
     stream << "  " << options_.executable_name << " check main.js\n";
     stream << "  " << options_.executable_name << " build main.js\n";
+    stream << "  " << options_.executable_name << " build . --project --out-dir dist --force\n";
+    stream << "  " << options_.executable_name << " install\n";
+    stream << "  " << options_.executable_name << " install softadastra/plugin-example@0.1.0\n";
+    stream << "  " << options_.executable_name << " update\n";
 
     return stream.str();
   }

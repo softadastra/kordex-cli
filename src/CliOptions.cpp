@@ -20,7 +20,12 @@ namespace kordex::cli
 {
   CliOptions CliOptions::defaults()
   {
-    return CliOptions{};
+    CliOptions options;
+
+    options.enable_install = true;
+    options.enable_update = true;
+
+    return options;
   }
 
   CliOptions CliOptions::development()
@@ -44,6 +49,8 @@ namespace kordex::cli
     options.enable_check = true;
     options.enable_build = true;
     options.enable_repl = true;
+    options.enable_install = true;
+    options.enable_update = true;
     options.enable_version = true;
 
     return options;
@@ -70,6 +77,8 @@ namespace kordex::cli
     options.enable_check = true;
     options.enable_build = true;
     options.enable_repl = true;
+    options.enable_install = true;
+    options.enable_update = true;
     options.enable_version = true;
 
     return options;
@@ -87,6 +96,9 @@ namespace kordex::cli
     options.debug = false;
     options.interactive = false;
 
+    options.enable_install = true;
+    options.enable_update = true;
+
     return options;
   }
 
@@ -101,6 +113,9 @@ namespace kordex::cli
     options.verbose = false;
     options.debug = false;
     options.interactive = false;
+
+    options.enable_install = true;
+    options.enable_update = true;
 
     return options;
   }
@@ -148,6 +163,8 @@ namespace kordex::cli
            enable_check ||
            enable_build ||
            enable_repl ||
+           enable_install ||
+           enable_update ||
            enable_version;
   }
 

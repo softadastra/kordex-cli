@@ -19,6 +19,9 @@
 
 #include <kordex/cli/Commands.hpp>
 #include <kordex/cli/Version.hpp>
+#include <kordex/cli/InstallCommand.hpp>
+#include <kordex/cli/UpdateCommand.hpp>
+#include <kordex/cli/PluginCommandRegistry.hpp>
 
 namespace kordex::cli
 {
@@ -136,6 +139,8 @@ namespace kordex::cli
         "check",
         "build",
         "repl",
+        "install",
+        "update",
         "version"};
   }
 
@@ -179,6 +184,16 @@ namespace kordex::cli
     if (name == "check")
     {
       return config.enable_check;
+    }
+
+    if (name == "install")
+    {
+      return config.command_enabled("install");
+    }
+
+    if (name == "update")
+    {
+      return config.command_enabled("update");
     }
 
     if (name == "build")
@@ -225,6 +240,16 @@ namespace kordex::cli
     if (name == "build")
     {
       return create_command_or_disabled("build", create_build_command());
+    }
+
+    if (name == "install")
+    {
+      return create_install_command();
+    }
+
+    if (name == "update")
+    {
+      return create_update_command();
     }
 
     if (name == "repl")
@@ -284,6 +309,28 @@ namespace kordex::cli
       return make_cli_error(
           CliErrorCode::CommandDisabled,
           "no built-in CLI command was registered");
+    }
+
+    PluginCommandLoadOptions plugin_options;
+    plugin_options.start_directory =
+        config.working_directory.empty()
+            ? "."
+            : config.working_directory;
+    plugin_options.search_parents = true;
+    plugin_options.allow_disabled = false;
+
+    auto plugin_registry = PluginCommandRegistry::load_from_project(
+        plugin_options);
+
+    if (plugin_registry)
+    {
+      const auto plugin_error = plugin_registry.value().register_into(
+          registry);
+
+      if (plugin_error)
+      {
+        return plugin_error;
+      }
     }
 
     return ok();

@@ -125,6 +125,10 @@ namespace kordex::cli
    */
   [[nodiscard]] Result<CommandRegistry> create_default_command_registry();
 
+  [[nodiscard]] Result<Command> create_install_command();
+
+  [[nodiscard]] Result<Command> create_update_command();
+
 } // namespace kordex::cli
 
 #endif // KORDEX_CLI_COMMANDS_HPP

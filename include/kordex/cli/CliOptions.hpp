@@ -152,6 +152,9 @@ namespace kordex::cli
      */
     bool enable_version{true};
 
+    bool enable_install{true};
+    bool enable_update{true};
+
     /**
      * @brief Return default CLI options.
      */
