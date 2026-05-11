@@ -16,9 +16,14 @@
 
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <utility>
 
-#include <kordex/runtime/SourceFile.hpp>
+#include <kordex/bindings/BindingOptions.hpp>
+#include <kordex/bindings/Bindings.hpp>
+#include <kordex/bindings/Engine.hpp>
+#include <kordex/bindings/ScriptResult.hpp>
+
 #include <kordex/cli/ReplCommand.hpp>
 
 namespace kordex::cli
@@ -50,8 +55,50 @@ namespace kordex::cli
       return stream.str();
     }
 
-    [[nodiscard]] ::std::string runtime_error_message(
-        const kordex::runtime::RuntimeResult &result)
+    [[nodiscard]] kordex::bindings::BindingOptions to_binding_options(
+        const ReplCommandOptions &options,
+        const CliConfig &config)
+    {
+      auto binding_options = options.debug || config.debug
+                                 ? kordex::bindings::BindingOptions::development()
+                                 : kordex::bindings::BindingOptions::defaults();
+
+      binding_options.backend = kordex::bindings::default_backend();
+      binding_options.module_policy = kordex::bindings::ModulePolicy::Full;
+
+      binding_options.allow_native_modules = true;
+      binding_options.allow_native_functions = true;
+      binding_options.allow_runtime_bridge = true;
+
+      binding_options.diagnostics = options.diagnostics;
+      binding_options.debug = options.debug || config.debug;
+      binding_options.source_maps = false;
+
+      binding_options.engine_name =
+          ::std::string("kordex-repl-") +
+          kordex::bindings::to_string(binding_options.backend);
+
+      return binding_options;
+    }
+
+    [[nodiscard]] ::std::string format_eval_success(
+        const kordex::bindings::ScriptResult &result)
+    {
+      if (!result.output.empty())
+      {
+        return result.output;
+      }
+
+      if (result.has_value())
+      {
+        return result.value.display();
+      }
+
+      return "Evaluated REPL source";
+    }
+
+    [[nodiscard]] ::std::string format_eval_failure(
+        const kordex::bindings::ScriptResult &result)
     {
       if (!result.error_output.empty())
       {
@@ -63,22 +110,22 @@ namespace kordex::cli
         return ::std::string(result.error.message());
       }
 
-      return "runtime evaluation failed";
+      return "REPL evaluation failed";
     }
 
-    [[nodiscard]] Error map_runtime_error(
-        const kordex::runtime::RuntimeResult &result)
+    [[nodiscard]] Error map_binding_error(
+        const kordex::bindings::ScriptResult &result)
     {
       if (result.error.has_error())
       {
         return make_cli_error(
-            CliErrorCode::RuntimeError,
+            CliErrorCode::BindingError,
             ::std::string(result.error.message()));
       }
 
       return make_cli_error(
-          CliErrorCode::RuntimeError,
-          "runtime evaluation failed");
+          CliErrorCode::BindingError,
+          "bindings evaluation failed");
     }
 
     [[nodiscard]] CliResult run_interactive_placeholder(
@@ -90,9 +137,9 @@ namespace kordex::cli
 
       ::std::ostringstream stream;
 
-      stream << "Kordex REPL is not connected to a JavaScript engine yet.\n";
-      stream << "Use `kordex repl --eval \"console.log('hello')\"` "
-             << "to validate the CLI flow.";
+      stream << "Kordex interactive REPL is not connected yet.\n";
+      stream << "Use `kordex repl --eval \"1 + 2\"` "
+             << "to evaluate JavaScript through the bindings engine.";
 
       return CliResult::success(stream.str());
     }
@@ -223,13 +270,6 @@ namespace kordex::cli
           "repl command requires eval source when interactive mode is disabled");
     }
 
-    if (!options.allow_fs)
-    {
-      return make_cli_error(
-          CliErrorCode::InvalidConfig,
-          "repl command requires filesystem access for runtime initialization");
-    }
-
     return ok();
   }
 
@@ -270,79 +310,61 @@ namespace kordex::cli
           1);
     }
 
-    auto runtime_options = to_runtime_options(options, config);
+    auto engine_result = kordex::bindings::Engine::create(
+        to_binding_options(options, config));
 
-    auto runtime_result = kordex::runtime::Runtime::from_options(
-        runtime_options);
-
-    if (!runtime_result)
+    if (!engine_result)
     {
       return CliResult::failure(
           make_cli_error(
-              CliErrorCode::RuntimeError,
-              ::std::string(runtime_result.error().message())),
+              CliErrorCode::BindingError,
+              ::std::string(engine_result.error().message())),
           1);
     }
 
-    auto runtime = ::std::move(runtime_result.value());
+    auto engine = ::std::move(engine_result.value());
 
-    auto start_error = runtime.start();
-    if (start_error)
+    auto init_result = engine.initialize();
+    if (!init_result.succeeded())
     {
       return CliResult::failure(
           make_cli_error(
-              CliErrorCode::RuntimeError,
-              ::std::string(start_error.message())),
-          1);
+              CliErrorCode::BindingError,
+              ::std::string(init_result.error.message())),
+          init_result.exit_code == 0 ? 1 : init_result.exit_code);
     }
 
-    auto source_result = kordex::runtime::SourceFile::from_content(
-        "<repl>",
-        options.eval);
+    auto result = engine.eval(
+        options.eval,
+        "repl.js");
 
-    if (!source_result)
-    {
-      (void)runtime.shutdown();
-
-      return CliResult::failure(
-          make_cli_error(
-              CliErrorCode::RuntimeError,
-              ::std::string(source_result.error().message())),
-          1);
-    }
-
-    auto result = runtime.run_source(::std::move(source_result.value()));
-
-    const auto shutdown_error = runtime.shutdown();
+    const auto shutdown_result = engine.shutdown();
 
     if (result.succeeded())
     {
-      if (shutdown_error)
+      if (!shutdown_result.succeeded())
       {
         return CliResult::failure(
             make_cli_error(
-                CliErrorCode::RuntimeError,
-                ::std::string(shutdown_error.message())),
-            1);
+                CliErrorCode::BindingError,
+                ::std::string(shutdown_result.error.message())),
+            shutdown_result.exit_code == 0 ? 1 : shutdown_result.exit_code);
       }
 
-      if (!result.output.empty())
-      {
-        return CliResult::success(result.output);
-      }
-
-      return CliResult::success("Evaluated REPL source");
+      return CliResult::success(
+          format_eval_success(result));
     }
 
     CliResult cli_result = CliResult::failure(
-        map_runtime_error(result),
+        map_binding_error(result),
         result.exit_code == 0 ? 1 : result.exit_code);
 
-    cli_result.error_output = runtime_error_message(result);
+    cli_result.error_output = format_eval_failure(result);
 
-    if (shutdown_error && cli_result.error_output.empty())
+    if (!shutdown_result.succeeded() && cli_result.error_output.empty())
     {
-      cli_result.error_output = ::std::string(shutdown_error.message());
+      cli_result.error_output =
+          ::std::string(shutdown_result.error.message());
     }
 
     return cli_result;
