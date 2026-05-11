@@ -10,7 +10,8 @@
 # Kordex CLI - Build Options
 # ====================================================================
 
-# ifndef(KORDEX_CLI_OPTIONS_INCLUDED)
+include_guard(GLOBAL)
+
 set(KORDEX_CLI_OPTIONS_INCLUDED ON)
 
 # --------------------------------------------------------------------
@@ -47,45 +48,88 @@ set(KORDEX_VIX_GIT_TAG
 set(KORDEX_RUNTIME_GIT_TAG
     "main"
     CACHE STRING
-    "Git tag or branch used for kordex runtime")
+    "Git tag or branch used for Kordex Runtime")
 
 set(KORDEX_BINDINGS_GIT_TAG
     "main"
     CACHE STRING
-    "Git tag or branch used for kordex bindings")
+    "Git tag or branch used for Kordex Bindings")
 
 set(KORDEX_STD_GIT_TAG
     "main"
     CACHE STRING
-    "Git tag or branch used for kordex std")
+    "Git tag or branch used for Kordex Std")
 
 # --------------------------------------------------------------------
-# Dependency fetch options
+# Dependency fetch policy
 # --------------------------------------------------------------------
-option(KORDEX_CLI_FETCH_RUNTIME "Auto-fetch kordex::runtime if missing" ON)
-option(KORDEX_CLI_FETCH_BINDINGS "Auto-fetch kordex::bindings if missing" ON)
-option(KORDEX_CLI_FETCH_STD "Auto-fetch kordex::std if missing" ON)
-
-option(KORDEX_CLI_FETCH_ERROR "Auto-fetch vix::error if missing" ON)
-option(KORDEX_CLI_FETCH_LOG "Auto-fetch vix::log if missing" ON)
-option(KORDEX_CLI_FETCH_JSON "Auto-fetch vix::json if missing" ON)
-option(KORDEX_CLI_FETCH_FS "Auto-fetch vix::fs if missing" ON)
-option(KORDEX_CLI_FETCH_PATH "Auto-fetch vix::path if missing" ON)
-option(KORDEX_CLI_FETCH_ENV "Auto-fetch vix::env if missing" ON)
-option(KORDEX_CLI_FETCH_PROCESS "Auto-fetch vix::process if missing" ON)
-option(KORDEX_CLI_FETCH_TIME "Auto-fetch vix::time if missing" ON)
+option(KORDEX_CLI_FETCH_KORDEX_DEPS "Auto-fetch missing Kordex dependencies" ON)
+option(KORDEX_CLI_FETCH_VIX_DEPS "Auto-fetch missing Vix dependencies" ON)
 option(KORDEX_CLI_FETCH_TESTS "Auto-fetch vix::tests if missing" ON)
+
+set(KORDEX_CLI_FETCH_RUNTIME
+    ${KORDEX_CLI_FETCH_KORDEX_DEPS}
+    CACHE BOOL
+    "Auto-fetch kordex::runtime if missing")
+
+set(KORDEX_CLI_FETCH_BINDINGS
+    ${KORDEX_CLI_FETCH_KORDEX_DEPS}
+    CACHE BOOL
+    "Auto-fetch kordex::bindings if missing")
+
+set(KORDEX_CLI_FETCH_STD
+    ${KORDEX_CLI_FETCH_KORDEX_DEPS}
+    CACHE BOOL
+    "Auto-fetch kordex::std if missing")
+
+set(KORDEX_CLI_FETCH_ERROR
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::error if missing")
+
+set(KORDEX_CLI_FETCH_LOG
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::log if missing")
+
+set(KORDEX_CLI_FETCH_JSON
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::json if missing")
+
+set(KORDEX_CLI_FETCH_FS
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::fs if missing")
+
+set(KORDEX_CLI_FETCH_PATH
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::path if missing")
+
+set(KORDEX_CLI_FETCH_ENV
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::env if missing")
+
+set(KORDEX_CLI_FETCH_PROCESS
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::process if missing")
+
+set(KORDEX_CLI_FETCH_TIME
+    ${KORDEX_CLI_FETCH_VIX_DEPS}
+    CACHE BOOL
+    "Auto-fetch vix::time if missing")
 
 # --------------------------------------------------------------------
 # Umbrella build policy
 # --------------------------------------------------------------------
-# When Kordex CLI is built inside the kordex umbrella repository,
-# dependencies should be provided by the umbrella build.
-#
-# In that mode, CLI must not fetch dependencies by itself.
-# The root project is responsible for add_subdirectory order.
-# --------------------------------------------------------------------
 if(DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD)
+  set(KORDEX_CLI_FETCH_KORDEX_DEPS OFF CACHE BOOL "Auto-fetch missing Kordex dependencies" FORCE)
+  set(KORDEX_CLI_FETCH_VIX_DEPS OFF CACHE BOOL "Auto-fetch missing Vix dependencies" FORCE)
+  set(KORDEX_CLI_FETCH_TESTS OFF CACHE BOOL "Auto-fetch vix::tests if missing" FORCE)
+
   set(KORDEX_CLI_FETCH_RUNTIME OFF CACHE BOOL "Auto-fetch kordex::runtime if missing" FORCE)
   set(KORDEX_CLI_FETCH_BINDINGS OFF CACHE BOOL "Auto-fetch kordex::bindings if missing" FORCE)
   set(KORDEX_CLI_FETCH_STD OFF CACHE BOOL "Auto-fetch kordex::std if missing" FORCE)
@@ -98,7 +142,4 @@ if(DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD)
   set(KORDEX_CLI_FETCH_ENV OFF CACHE BOOL "Auto-fetch vix::env if missing" FORCE)
   set(KORDEX_CLI_FETCH_PROCESS OFF CACHE BOOL "Auto-fetch vix::process if missing" FORCE)
   set(KORDEX_CLI_FETCH_TIME OFF CACHE BOOL "Auto-fetch vix::time if missing" FORCE)
-  set(KORDEX_CLI_FETCH_TESTS OFF CACHE BOOL "Auto-fetch vix::tests if missing" FORCE)
 endif()
-
-# endif()
