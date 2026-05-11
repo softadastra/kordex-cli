@@ -321,18 +321,18 @@ Plugin commands are loaded with isolated permissions. They cannot override built
 From the module directory:
 
 ```bash
-cmake -S . -B build-ninja -G Ninja
-cmake --build build-ninja
+vix build --preset dev-ninja
 ```
 
 With tests:
 
 ```bash
-cmake -S . -B build-ninja -G Ninja \
+vix build \
+  --preset dev-ninja \
+  -- \
   -DKORDEX_CLI_BUILD_TESTS=ON
 
-cmake --build build-ninja
-ctest --test-dir build-ninja --output-on-failure
+vix tests -- --output-on-failure
 ```
 
 ## Integration tests
@@ -350,7 +350,7 @@ The CLI integration test covers:
 Run:
 
 ```bash
-ctest --test-dir build-ninja -R kordex_cli_integration_tests --output-on-failure
+vix tests -R kordex_cli_integration_tests
 ```
 
 ## Module role
