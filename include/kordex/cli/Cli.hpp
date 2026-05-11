@@ -1,11 +1,11 @@
 /**
  *
  *  @file Cli.hpp
- *  @author Gaspard Kirira
+ *  @author Softadastra
  *
- *  Copyright 2026, Gaspard Kirira.
+ *  Copyright 2026, Softadastra.
  *  All rights reserved.
- *  https://github.com/kordexjs/cli
+ *  https://github.com/softadastra/kordex-cli
  *
  *  Use of this source code is governed by a MIT license
  *  that can be found in the LICENSE file.
