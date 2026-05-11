@@ -23,6 +23,8 @@
 #include <kordex/bindings/Bindings.hpp>
 #include <kordex/bindings/Engine.hpp>
 #include <kordex/bindings/ScriptResult.hpp>
+#include <kordex/std/Std.hpp>
+#include <kordex/std/StdOptions.hpp>
 
 #include <kordex/cli/ReplCommand.hpp>
 
@@ -332,6 +334,32 @@ namespace kordex::cli
               CliErrorCode::BindingError,
               ::std::string(init_result.error.message())),
           init_result.exit_code == 0 ? 1 : init_result.exit_code);
+    }
+
+    kordex::standard::StdOptions std_options =
+        config.debug || options.debug
+            ? kordex::standard::StdOptions::development()
+            : kordex::standard::StdOptions::production();
+
+    std_options.enable_fs = options.allow_fs;
+    std_options.enable_env = options.allow_env;
+    std_options.enable_process = options.allow_process;
+    std_options.enable_http = options.allow_net;
+
+    const auto std_error = kordex::standard::install(
+        engine,
+        std_options);
+
+    if (std_error)
+    {
+      const auto shutdown_result = engine.shutdown();
+      (void)shutdown_result;
+
+      return CliResult::failure(
+          make_cli_error(
+              CliErrorCode::StdError,
+              ::std::string(std_error.message())),
+          1);
     }
 
     auto result = engine.eval(

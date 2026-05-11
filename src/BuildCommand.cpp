@@ -14,10 +14,24 @@
  *
  */
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <regex>
 #include <sstream>
+#include <string>
 #include <utility>
+#include <vector>
+
+#include <kordex/bindings/EngineContext.hpp>
+#include <kordex/bindings/ModuleLoader.hpp>
+#include <kordex/bindings/Script.hpp>
+
+#include <kordex/runtime/SourceFile.hpp>
+
+#include <kordex/std/Std.hpp>
+#include <kordex/std/StdOptions.hpp>
 
 #include <kordex/cli/BuildCommand.hpp>
 
@@ -31,68 +45,52 @@ namespace kordex::cli
       return value.size() > 1 && value.front() == '-';
     }
 
-    [[nodiscard]] ::std::string default_output_name_for_file(
-        const ::std::string &file)
+    [[nodiscard]] bool ends_with(
+        const ::std::string &value,
+        const ::std::string &suffix) noexcept
     {
-      const ::std::filesystem::path path(file);
+      return value.size() >= suffix.size() &&
+             value.compare(
+                 value.size() - suffix.size(),
+                 suffix.size(),
+                 suffix) == 0;
+    }
 
-      auto stem = path.stem().string();
-      if (stem.empty())
+    [[nodiscard]] ::std::string trim(
+        ::std::string value)
+    {
+      auto not_space = [](unsigned char character)
       {
-        stem = "main";
-      }
+        return !::std::isspace(character);
+      };
 
-      return stem + ".js";
+      value.erase(
+          value.begin(),
+          ::std::find_if(value.begin(), value.end(), not_space));
+
+      value.erase(
+          ::std::find_if(value.rbegin(), value.rend(), not_space).base(),
+          value.end());
+
+      return value;
     }
 
-    [[nodiscard]] ::std::filesystem::path project_manifest_path(
-        const ::std::filesystem::path &root)
-    {
-      const auto kordex_json = root / "kordex.json";
-      if (::std::filesystem::exists(kordex_json))
-      {
-        return kordex_json;
-      }
-
-      return root / "package.json";
-    }
-
-    [[nodiscard]] ::std::filesystem::path make_output_path(
-        const BuildCommandOptions &options)
-    {
-      const ::std::filesystem::path output_dir(options.output_dir);
-
-      const ::std::string output_name =
-          options.output_name.empty()
-              ? default_output_name_for_file(options.input)
-              : options.output_name;
-
-      return output_dir / output_name;
-    }
-
-    [[nodiscard]] Error ensure_parent_directory(
+    [[nodiscard]] ::std::string read_text_file(
         const ::std::filesystem::path &path)
     {
-      try
+      ::std::ifstream input(path, ::std::ios::binary);
+      if (!input)
       {
-        const auto parent = path.parent_path();
-
-        if (!parent.empty())
-        {
-          ::std::filesystem::create_directories(parent);
-        }
-      }
-      catch (const ::std::filesystem::filesystem_error &exception)
-      {
-        return make_cli_error(
-            CliErrorCode::IoError,
-            exception.what());
+        return {};
       }
 
-      return ok();
+      ::std::ostringstream stream;
+      stream << input.rdbuf();
+
+      return stream.str();
     }
 
-    [[nodiscard]] Error write_output_file(
+    [[nodiscard]] Error write_text_file(
         const ::std::filesystem::path &path,
         const ::std::string &content,
         bool force)
@@ -103,26 +101,27 @@ namespace kordex::cli
         {
           return make_cli_error(
               CliErrorCode::IoError,
-              "output file already exists: " + path.string());
+              "output file already exists, use --force to overwrite: " +
+                  path.string());
         }
 
-        const auto directory_error = ensure_parent_directory(path);
-        if (directory_error)
+        const auto parent = path.parent_path();
+        if (!parent.empty())
         {
-          return directory_error;
+          ::std::filesystem::create_directories(parent);
         }
 
-        ::std::ofstream file(path, ::std::ios::binary | ::std::ios::trunc);
-        if (!file)
+        ::std::ofstream output(path, ::std::ios::binary | ::std::ios::trunc);
+        if (!output)
         {
           return make_cli_error(
               CliErrorCode::IoError,
               "failed to open output file: " + path.string());
         }
 
-        file << content;
+        output << content;
 
-        if (!file)
+        if (!output)
         {
           return make_cli_error(
               CliErrorCode::IoError,
@@ -139,91 +138,303 @@ namespace kordex::cli
       return ok();
     }
 
-    [[nodiscard]] ::std::string build_banner(
-        const BuildCommandOptions &options)
+    [[nodiscard]] ::std::string extract_json_string(
+        const ::std::string &json,
+        const ::std::string &key)
     {
-      ::std::ostringstream stream;
+      const ::std::regex pattern(
+          "\"" + key + "\"\\s*:\\s*\"([^\"]+)\"");
 
-      stream << "/* Built by Kordex CLI */\n";
-      stream << "/* input: " << options.input << " */\n";
+      ::std::smatch match;
 
-      if (options.minify)
+      if (::std::regex_search(json, match, pattern) &&
+          match.size() >= 2)
       {
-        stream << "/* minify: requested */\n";
+        return match[1].str();
       }
 
-      if (options.source_maps)
-      {
-        stream << "/* sourceMap: requested */\n";
-      }
-
-      stream << '\n';
-
-      return stream.str();
-    }
-
-    [[nodiscard]] ::std::string source_type_name(
-        kordex::runtime::SourceType type)
-    {
-      return ::std::string(kordex::runtime::to_string(type));
+      return {};
     }
 
     [[nodiscard]] Result<::std::string> resolve_project_entry(
-        const ::std::string &directory)
+        const ::std::filesystem::path &project_dir)
     {
-      const ::std::filesystem::path root(directory);
-      const auto manifest_path = project_manifest_path(root);
-
-      if (!::std::filesystem::exists(manifest_path))
+      const auto kordex_json = project_dir / "kordex.json";
+      if (::std::filesystem::exists(kordex_json))
       {
-        return make_cli_error(
-            CliErrorCode::IoError,
-            "project manifest not found: " + directory);
-      }
+        const auto content = read_text_file(kordex_json);
+        const auto entry = extract_json_string(content, "entry");
 
-      auto manifest = kordex::runtime::Manifest::load(
-          manifest_path.string());
-
-      if (!manifest)
-      {
-        return make_cli_error(
-            CliErrorCode::IoError,
-            ::std::string(manifest.error().message()));
-      }
-
-      if (!manifest.value().has_entry())
-      {
-        return make_cli_error(
-            CliErrorCode::InvalidConfig,
-            "project manifest has no entry file");
-      }
-
-      return (root / manifest.value().entry).string();
-    }
-
-    [[nodiscard]] Result<kordex::runtime::SourceFile> load_build_source(
-        const BuildCommandOptions &options)
-    {
-      if (options.kind == BuildKind::Project)
-      {
-        auto entry = resolve_project_entry(options.input);
-        if (!entry)
+        if (!entry.empty())
         {
-          return entry.error();
+          return (::std::filesystem::path(project_dir) / entry)
+              .lexically_normal()
+              .string();
+        }
+      }
+
+      const auto package_json = project_dir / "package.json";
+      if (::std::filesystem::exists(package_json))
+      {
+        const auto content = read_text_file(package_json);
+
+        ::std::string entry = extract_json_string(content, "kordex");
+        if (!entry.empty())
+        {
+          return (::std::filesystem::path(project_dir) / entry)
+              .lexically_normal()
+              .string();
         }
 
-        return kordex::runtime::SourceFile::load(entry.value());
+        entry = extract_json_string(content, "module");
+        if (!entry.empty())
+        {
+          return (::std::filesystem::path(project_dir) / entry)
+              .lexically_normal()
+              .string();
+        }
+
+        entry = extract_json_string(content, "main");
+        if (!entry.empty())
+        {
+          return (::std::filesystem::path(project_dir) / entry)
+              .lexically_normal()
+              .string();
+        }
       }
 
-      return kordex::runtime::SourceFile::load(options.input);
+      const ::std::vector<::std::filesystem::path> candidates = {
+          project_dir / "src" / "main.ts",
+          project_dir / "src" / "main.js",
+          project_dir / "main.ts",
+          project_dir / "main.js",
+          project_dir / "index.ts",
+          project_dir / "index.js"};
+
+      for (const auto &candidate : candidates)
+      {
+        if (::std::filesystem::exists(candidate) &&
+            ::std::filesystem::is_regular_file(candidate))
+        {
+          return candidate.lexically_normal().string();
+        }
+      }
+
+      return make_cli_error(
+          CliErrorCode::IoError,
+          "could not find project entry in: " + project_dir.string());
     }
 
-    [[nodiscard]] Error validate_input_exists(
+    [[nodiscard]] Result<::std::string> resolve_entry(
         const BuildCommandOptions &options)
     {
+      const ::std::filesystem::path input(options.input);
+
+      if (options.kind == BuildKind::Project ||
+          (::std::filesystem::exists(input) &&
+           ::std::filesystem::is_directory(input)))
+      {
+        return resolve_project_entry(input);
+      }
+
+      return input.lexically_normal().string();
+    }
+
+    [[nodiscard]] ::std::string default_output_name(
+        const ::std::string &entry)
+    {
+      const ::std::filesystem::path path(entry);
+      ::std::string name = path.stem().string();
+
+      if (name.empty())
+      {
+        name = "main";
+      }
+
+      return name + ".js";
+    }
+
+    [[nodiscard]] ::std::filesystem::path output_path_for(
+        const BuildCommandOptions &options,
+        const ::std::string &entry)
+    {
+      ::std::string output_name = options.output_name;
+
+      if (output_name.empty())
+      {
+        output_name = default_output_name(entry);
+      }
+
+      if (!ends_with(output_name, ".js"))
+      {
+        output_name += ".js";
+      }
+
+      return ::std::filesystem::path(options.output_dir) / output_name;
+    }
+
+    [[nodiscard]] ::std::string simple_minify(
+        const ::std::string &source)
+    {
+      ::std::ostringstream output;
+
+      bool in_single_quote = false;
+      bool in_double_quote = false;
+      bool in_template = false;
+      bool escaped = false;
+      bool previous_space = false;
+
+      for (::std::size_t index = 0; index < source.size(); ++index)
+      {
+        const char character = source[index];
+
+        if (escaped)
+        {
+          output << character;
+          escaped = false;
+          previous_space = false;
+          continue;
+        }
+
+        if (character == '\\' &&
+            (in_single_quote || in_double_quote || in_template))
+        {
+          output << character;
+          escaped = true;
+          previous_space = false;
+          continue;
+        }
+
+        if (character == '\'' && !in_double_quote && !in_template)
+        {
+          in_single_quote = !in_single_quote;
+          output << character;
+          previous_space = false;
+          continue;
+        }
+
+        if (character == '"' && !in_single_quote && !in_template)
+        {
+          in_double_quote = !in_double_quote;
+          output << character;
+          previous_space = false;
+          continue;
+        }
+
+        if (character == '`' && !in_single_quote && !in_double_quote)
+        {
+          in_template = !in_template;
+          output << character;
+          previous_space = false;
+          continue;
+        }
+
+        if (in_single_quote || in_double_quote || in_template)
+        {
+          output << character;
+          previous_space = false;
+          continue;
+        }
+
+        if (::std::isspace(static_cast<unsigned char>(character)))
+        {
+          if (!previous_space)
+          {
+            output << ' ';
+            previous_space = true;
+          }
+
+          continue;
+        }
+
+        output << character;
+        previous_space = false;
+      }
+
+      return trim(output.str());
+    }
+
+    [[nodiscard]] Result<::std::string> bundle_entry(
+        const ::std::string &entry,
+        BuildReport &report)
+    {
+      auto script = kordex::bindings::Script::load(entry);
+      if (!script)
+      {
+        return make_cli_error(
+            CliErrorCode::BindingError,
+            ::std::string(script.error().message()));
+      }
+
+      kordex::bindings::BindingConfig binding_config;
+      binding_config.engine_name = "kordex-build";
+      binding_config.backend = kordex::bindings::EngineBackend::Native;
+      binding_config.module_policy = kordex::bindings::ModulePolicy::Full;
+      binding_config.allow_native_modules = true;
+      binding_config.allow_native_functions = true;
+      binding_config.allow_runtime_bridge = true;
+
+      kordex::bindings::EngineContext context(binding_config);
+      const auto init_error = context.initialize();
+      if (init_error)
+      {
+        return make_cli_error(
+            CliErrorCode::BindingError,
+            ::std::string(init_error.message()));
+      }
+
+      auto std_options = kordex::standard::StdOptions::production();
+      std_options.enable_process = false;
+      std_options.enable_http = false;
+
+      const auto std_error = kordex::standard::install(
+          context,
+          std_options);
+
+      if (std_error)
+      {
+        return make_cli_error(
+            CliErrorCode::StdError,
+            ::std::string(std_error.message()));
+      }
+
+      kordex::bindings::ModuleLoader loader(&context);
+
+      auto loaded = loader.load_entry(script.value());
+      if (!loaded)
+      {
+        return make_cli_error(
+            CliErrorCode::BindingError,
+            ::std::string(loaded.error().message()));
+      }
+
+      report.messages.push_back(
+          "modules bundled: " +
+          ::std::to_string(loaded.value().report.loaded_modules.size()));
+
+      if (loaded.value().report.used_cache)
+      {
+        report.messages.push_back("module cache used");
+      }
+
+      return loaded.value().script.source();
+    }
+
+    [[nodiscard]] Error ensure_input_valid(
+        const BuildCommandOptions &options)
+    {
+      if (options.input.empty())
+      {
+        return make_cli_error(
+            CliErrorCode::InvalidArgument,
+            "build command requires an input file or project directory");
+      }
+
       try
       {
-        if (!::std::filesystem::exists(options.input))
+        const ::std::filesystem::path input(options.input);
+
+        if (!::std::filesystem::exists(input))
         {
           return make_cli_error(
               CliErrorCode::IoError,
@@ -231,19 +442,11 @@ namespace kordex::cli
         }
 
         if (options.kind == BuildKind::SourceFile &&
-            !::std::filesystem::is_regular_file(options.input))
+            ::std::filesystem::is_directory(input))
         {
           return make_cli_error(
-              CliErrorCode::IoError,
-              "build input is not a file: " + options.input);
-        }
-
-        if (options.kind == BuildKind::Project &&
-            !::std::filesystem::is_directory(options.input))
-        {
-          return make_cli_error(
-              CliErrorCode::IoError,
-              "build input is not a project directory: " + options.input);
+              CliErrorCode::InvalidArgument,
+              "build input is a directory, use --project");
         }
       }
       catch (const ::std::filesystem::filesystem_error &exception)
@@ -286,6 +489,8 @@ namespace kordex::cli
       const CommandContext &context)
   {
     BuildCommandOptions options;
+    options.output_dir = "dist";
+    options.kind = BuildKind::SourceFile;
 
     for (::std::size_t index = 0; index < context.args.size(); ++index)
     {
@@ -334,7 +539,7 @@ namespace kordex::cli
         continue;
       }
 
-      if (arg == "--out-dir")
+      if (arg == "--out-dir" || arg == "-o")
       {
         if (index + 1 >= context.args.size())
         {
@@ -347,13 +552,13 @@ namespace kordex::cli
         continue;
       }
 
-      if (arg == "--out")
+      if (arg == "--out-file")
       {
         if (index + 1 >= context.args.size())
         {
           return make_cli_error(
               CliErrorCode::InvalidArgument,
-              "missing value for --out");
+              "missing value for --out-file");
         }
 
         options.output_name = context.args[++index];
@@ -397,13 +602,6 @@ namespace kordex::cli
           "build command requires an input file or project directory");
     }
 
-    if (is_flag(options.input))
-    {
-      return make_cli_error(
-          CliErrorCode::InvalidArgument,
-          "build input cannot be an option");
-    }
-
     if (options.output_dir.empty())
     {
       return make_cli_error(
@@ -411,32 +609,27 @@ namespace kordex::cli
           "build output directory cannot be empty");
     }
 
-    if (!options.output_name.empty() && is_flag(options.output_name))
-    {
-      return make_cli_error(
-          CliErrorCode::InvalidArgument,
-          "build output name cannot be an option");
-    }
-
-    return ok();
+    return ensure_input_valid(options);
   }
 
   Result<BuildReport> build_input(
       const BuildCommandOptions &options)
   {
-    const auto validation = validate_build_options(options);
-    if (validation)
+    BuildReport report;
+    report.kind = options.kind;
+    report.input = options.input;
+    report.source_maps = options.source_maps;
+    report.minify = options.minify;
+
+    auto entry = resolve_entry(options);
+    if (!entry)
     {
-      return validation;
+      return entry.error();
     }
 
-    const auto input_error = validate_input_exists(options);
-    if (input_error)
-    {
-      return input_error;
-    }
+    report.entry = entry.value();
 
-    auto source = load_build_source(options);
+    auto source = kordex::runtime::SourceFile::load(report.entry);
     if (!source)
     {
       return make_cli_error(
@@ -444,31 +637,39 @@ namespace kordex::cli
           ::std::string(source.error().message()));
     }
 
-    if (!source.value().executable())
-    {
-      return make_cli_error(
-          CliErrorCode::InvalidArgument,
-          "build input is not an executable JavaScript or TypeScript source");
-    }
-
-    BuildReport report;
-    report.kind = options.kind;
-    report.input = options.input;
-    report.entry = source.value().path;
     report.source_type = source.value().type;
     report.source_size = source.value().size();
-    report.minify = options.minify;
-    report.source_maps = options.source_maps;
 
-    const auto output_path = make_output_path(options);
-    report.output = output_path.string();
+    auto bundled = bundle_entry(
+        report.entry,
+        report);
 
-    ::std::string output_content = build_banner(options);
-    output_content += source.value().content;
+    if (!bundled)
+    {
+      return bundled.error();
+    }
 
-    const auto write_error = write_output_file(
+    ::std::string output = bundled.value();
+
+    if (options.minify)
+    {
+      output = simple_minify(output);
+      report.messages.push_back("minified output");
+    }
+
+    if (options.source_maps)
+    {
+      report.messages.push_back(
+          "source map generation is reserved for the next step");
+    }
+
+    const auto output_path = output_path_for(
+        options,
+        report.entry);
+
+    const auto write_error = write_text_file(
         output_path,
-        output_content,
+        output,
         options.force);
 
     if (write_error)
@@ -476,19 +677,8 @@ namespace kordex::cli
       return write_error;
     }
 
+    report.output = output_path.string();
     report.ok = true;
-    report.messages.push_back("build completed");
-    report.messages.push_back("output written to " + report.output);
-
-    if (options.minify)
-    {
-      report.messages.push_back("minification requested but not implemented yet");
-    }
-
-    if (options.source_maps)
-    {
-      report.messages.push_back("source map generation requested but not implemented yet");
-    }
 
     return report;
   }
@@ -499,30 +689,34 @@ namespace kordex::cli
   {
     ::std::ostringstream stream;
 
-    if (report.ok)
+    if (!report.ok)
     {
-      stream << "Build passed: " << report.input << '\n';
-    }
-    else
-    {
-      stream << "Build failed: " << report.input << '\n';
+      stream << "Build failed";
+      return stream.str();
     }
 
-    stream << "output = " << report.output << '\n';
+    stream << "Build completed\n";
+    stream << "input  = " << report.input << '\n';
+    stream << "entry  = " << report.entry << '\n';
+    stream << "output = " << report.output;
 
     if (options.details)
     {
-      stream << "kind       = " << to_string(report.kind) << '\n';
-      stream << "entry      = " << report.entry << '\n';
-      stream << "type       = " << source_type_name(report.source_type) << '\n';
-      stream << "size       = " << report.source_size << " bytes\n";
-      stream << "minify     = " << (report.minify ? "yes" : "no") << '\n';
-      stream << "source map = " << (report.source_maps ? "yes" : "no") << '\n';
-    }
+      stream << '\n';
+      stream << "kind   = " << to_string(report.kind) << '\n';
+      stream << "type   = "
+             << kordex::runtime::to_string(report.source_type)
+             << '\n';
+      stream << "size   = " << report.source_size << " bytes";
 
-    for (const auto &message : report.messages)
-    {
-      stream << "- " << message << '\n';
+      if (report.has_messages())
+      {
+        for (const auto &message : report.messages)
+        {
+          stream << '\n'
+                 << "- " << message;
+        }
+      }
     }
 
     return stream.str();
@@ -540,9 +734,8 @@ namespace kordex::cli
     if (context.config.dry_run)
     {
       ::std::ostringstream stream;
-
-      stream << "Would build " << options.value().input
-             << " into " << make_output_path(options.value()).string();
+      stream << "Would build " << options.value().input;
+      stream << " into " << options.value().output_dir;
 
       return CliResult::success(stream.str());
     }
@@ -562,11 +755,11 @@ namespace kordex::cli
     CommandInfo info;
     info.name = "build";
     info.aliases = {};
-    info.summary = "Build a source file or project";
+    info.summary = "Bundle a JavaScript or TypeScript file";
     info.description =
-        "Build a JavaScript or TypeScript source file, or a Kordex project directory.";
+        "Analyze imports, bundle modules, and generate a runnable JavaScript output file.";
     info.usage =
-        "kordex build <file|project> [--project] [--out-dir dist] [--out name.js]";
+        "kordex build <file|project> [--project] [--out-dir dist] [--out-file main.js] [--minify] [--force]";
     info.hidden = false;
     info.enabled = true;
 
