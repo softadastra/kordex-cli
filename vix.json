@@ -1,0 +1,32 @@
+{
+  "name": "kordex-cli",
+  "namespace": "softadastra",
+  "version": "0.1.0",
+  "type": "library",
+  "include": "include",
+  "license": "MIT",
+  "description": "Official command line interface for Kordex, providing commands to initialize, run, check, build, and interact with reliable local-first JavaScript applications.",
+  "keywords": [
+    "cpp",
+    "cli",
+    "javascript-runtime",
+    "developer-tools",
+    "local-first",
+    "kordex",
+    "softadastra",
+    "vix"
+  ],
+  "repository": "https://github.com/softadastra/kordex-cli",
+  "authors": [
+    {
+      "name": "Softadastra",
+      "github": "softadastra"
+    }
+  ],
+  "deps": [
+    {
+      "id": "softadastra/kordex-std",
+      "version": "0.1.0"
+    }
+  ]
+}

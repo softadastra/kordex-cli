@@ -48,25 +48,30 @@ namespace
 
   [[nodiscard]] bool test_version_string()
   {
+    constexpr std::string_view expected = "0.1.0";
+
     return expect_true(
-        kordex::cli::version() == std::string_view("0.1.0"),
-        "version string should be 0.1.0");
+               kordex::cli::version() == expected,
+               "version string should be 0.1.0") &&
+           expect_true(
+               kordex::cli::version_string == expected,
+               "version constant should be 0.1.0");
   }
 
   [[nodiscard]] bool test_version_constants()
   {
     return expect_true(
-               kordex::cli::KORDEX_CLI_VERSION_MAJOR_VALUE == 0,
-               "major version constant should be 0") &&
+               kordex::cli::version_major_value ==
+                   kordex::cli::version_major(),
+               "major constant should match version_major") &&
            expect_true(
-               kordex::cli::KORDEX_CLI_VERSION_MINOR_VALUE == 1,
-               "minor version constant should be 1") &&
+               kordex::cli::version_minor_value ==
+                   kordex::cli::version_minor(),
+               "minor constant should match version_minor") &&
            expect_true(
-               kordex::cli::KORDEX_CLI_VERSION_PATCH_VALUE == 0,
-               "patch version constant should be 0") &&
-           expect_true(
-               kordex::cli::KORDEX_CLI_VERSION == std::string_view("0.1.0"),
-               "version constant should be 0.1.0");
+               kordex::cli::version_patch_value ==
+                   kordex::cli::version_patch(),
+               "patch constant should match version_patch");
   }
 } // namespace
 

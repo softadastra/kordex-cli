@@ -24,21 +24,21 @@ namespace kordex::cli
   /**
    * @brief Kordex CLI semantic version numbers.
    */
-  inline constexpr int KORDEX_CLI_VERSION_MAJOR_VALUE = 0;
-  inline constexpr int KORDEX_CLI_VERSION_MINOR_VALUE = 1;
-  inline constexpr int KORDEX_CLI_VERSION_PATCH_VALUE = 0;
+  inline constexpr int version_major_value = 0;
+  inline constexpr int version_minor_value = 1;
+  inline constexpr int version_patch_value = 0;
 
   /**
    * @brief Kordex CLI version as a stable string.
    */
-  inline constexpr std::string_view KORDEX_CLI_VERSION = "0.1.0";
+  inline constexpr std::string_view version_string = "0.1.0";
 
   /**
    * @brief Return the Kordex CLI major version.
    */
   [[nodiscard]] constexpr int version_major() noexcept
   {
-    return KORDEX_CLI_VERSION_MAJOR_VALUE;
+    return version_major_value;
   }
 
   /**
@@ -46,7 +46,7 @@ namespace kordex::cli
    */
   [[nodiscard]] constexpr int version_minor() noexcept
   {
-    return KORDEX_CLI_VERSION_MINOR_VALUE;
+    return version_minor_value;
   }
 
   /**
@@ -54,7 +54,7 @@ namespace kordex::cli
    */
   [[nodiscard]] constexpr int version_patch() noexcept
   {
-    return KORDEX_CLI_VERSION_PATCH_VALUE;
+    return version_patch_value;
   }
 
   /**
@@ -62,7 +62,7 @@ namespace kordex::cli
    */
   [[nodiscard]] constexpr std::string_view version() noexcept
   {
-    return KORDEX_CLI_VERSION;
+    return version_string;
   }
 
 } // namespace kordex::cli
