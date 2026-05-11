@@ -90,6 +90,141 @@ namespace kordex::cli
       return stream.str();
     }
 
+    [[nodiscard]] ::std::string json_escape_string(
+        const ::std::string &value)
+    {
+      ::std::string result;
+      result.reserve(value.size() + 8);
+
+      for (char character : value)
+      {
+        switch (character)
+        {
+        case '\\':
+          result += "\\\\";
+          break;
+        case '"':
+          result += "\\\"";
+          break;
+        case '\n':
+          result += "\\n";
+          break;
+        case '\r':
+          result += "\\r";
+          break;
+        case '\t':
+          result += "\\t";
+          break;
+        default:
+          result += character;
+          break;
+        }
+      }
+
+      return result;
+    }
+
+    [[nodiscard]] ::std::string relative_source_path(
+        const ::std::filesystem::path &source,
+        const ::std::filesystem::path &base)
+    {
+      try
+      {
+        return ::std::filesystem::relative(source, base).string();
+      }
+      catch (...)
+      {
+        return source.lexically_normal().string();
+      }
+    }
+
+    [[nodiscard]] ::std::string build_source_map_json(
+        const BuildReport &report,
+        const ::std::filesystem::path &output_path,
+        const ::std::string &generated_file_name)
+    {
+      const auto entry_path = ::std::filesystem::path(report.entry);
+      const auto output_dir = output_path.parent_path();
+
+      const ::std::string source_name = relative_source_path(
+          entry_path,
+          output_dir.empty() ? ::std::filesystem::current_path() : output_dir);
+
+      const ::std::string source_content = read_text_file(entry_path);
+
+      ::std::ostringstream stream;
+
+      stream << "{\n";
+      stream << "  \"version\": 3,\n";
+      stream << "  \"file\": \""
+             << json_escape_string(generated_file_name)
+             << "\",\n";
+
+      stream << "  \"sources\": [";
+      stream << "\""
+             << json_escape_string(source_name)
+             << "\"";
+      stream << "],\n";
+
+      stream << "  \"sourcesContent\": [";
+      stream << "\""
+             << json_escape_string(source_content)
+             << "\"";
+      stream << "],\n";
+
+      stream << "  \"names\": [],\n";
+
+      /*
+       * MVP source map.
+       *
+       * Empty mappings are valid source-map v3.
+       * They preserve source identity and source content now, while leaving
+       * detailed line/column mappings for the next bundler iteration.
+       */
+      stream << "  \"mappings\": \"\"\n";
+      stream << "}\n";
+
+      return stream.str();
+    }
+
+    [[nodiscard]] Error write_source_map_file(
+        const BuildReport &report,
+        const ::std::filesystem::path &output_path,
+        bool force)
+    {
+      const ::std::filesystem::path map_path =
+          ::std::filesystem::path(output_path.string() + ".map");
+
+      const ::std::string map_json = build_source_map_json(
+          report,
+          output_path,
+          output_path.filename().string());
+
+      return write_text_file(
+          map_path,
+          map_json,
+          force);
+    }
+
+    [[nodiscard]] ::std::string append_source_mapping_url(
+        ::std::string output,
+        const ::std::filesystem::path &output_path)
+    {
+      const ::std::string map_name =
+          output_path.filename().string() + ".map";
+
+      if (!output.empty() && output.back() != '\n')
+      {
+        output += '\n';
+      }
+
+      output += "\n//# sourceMappingURL=";
+      output += map_name;
+      output += '\n';
+
+      return output;
+    }
+
     [[nodiscard]] Error write_text_file(
         const ::std::filesystem::path &path,
         const ::std::string &content,
@@ -657,15 +792,16 @@ namespace kordex::cli
       report.messages.push_back("minified output");
     }
 
-    if (options.source_maps)
-    {
-      report.messages.push_back(
-          "source map generation is reserved for the next step");
-    }
-
     const auto output_path = output_path_for(
         options,
         report.entry);
+
+    if (options.source_maps)
+    {
+      output = append_source_mapping_url(
+          output,
+          output_path);
+    }
 
     const auto write_error = write_text_file(
         output_path,
@@ -675,6 +811,22 @@ namespace kordex::cli
     if (write_error)
     {
       return write_error;
+    }
+
+    if (options.source_maps)
+    {
+      const auto map_error = write_source_map_file(
+          report,
+          output_path,
+          options.force);
+
+      if (map_error)
+      {
+        return map_error;
+      }
+
+      report.messages.push_back(
+          "source map generated: " + output_path.string() + ".map");
     }
 
     report.output = output_path.string();
