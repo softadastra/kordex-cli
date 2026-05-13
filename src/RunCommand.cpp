@@ -81,7 +81,7 @@ namespace kordex::cli
                                  ? kordex::bindings::BindingOptions::development()
                                  : kordex::bindings::BindingOptions::defaults();
 
-      binding_options.backend = kordex::bindings::default_backend();
+      binding_options.backend = kordex::bindings::EngineBackend::QuickJS;
       binding_options.module_policy = kordex::bindings::ModulePolicy::Full;
 
       binding_options.allow_native_modules = true;
@@ -210,16 +210,6 @@ namespace kordex::cli
       const auto std_error = install_std_modules_for_runtime(
           engine,
           runtime_options);
-
-      if (std_error)
-      {
-        const auto shutdown_result = engine.shutdown();
-        (void)shutdown_result;
-
-        return CliResult::failure(
-            std_error,
-            1);
-      }
 
       if (std_error)
       {
