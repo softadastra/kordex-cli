@@ -89,8 +89,9 @@ namespace kordex::cli
       stream << "  \"version\": \"0.1.0\",\n";
       stream << "  \"type\": \"module\",\n";
       stream << "  \"scripts\": {\n";
-      stream << "    \"dev\": \"kordex run src/main.js\",\n";
-      stream << "    \"start\": \"kordex run src/main.js\",\n";
+      stream << "    \"dev\": \"kordex run\",\n";
+      stream << "    \"start\": \"kordex run\",\n";
+      stream << "    \"build\": \"kordex build\",\n";
       stream << "    \"check\": \"kordex check src/main.js\"\n";
       stream << "  }\n";
       stream << "}\n";
@@ -107,6 +108,11 @@ namespace kordex::cli
       stream << "  \"name\": \"" << options.name << "\",\n";
       stream << "  \"version\": \"0.1.0\",\n";
       stream << "  \"entry\": \"src/main.js\",\n";
+      stream << "  \"scripts\": {\n";
+      stream << "    \"dev\": \"kordex run\",\n";
+      stream << "    \"start\": \"kordex run\",\n";
+      stream << "    \"build\": \"kordex build\"\n";
+      stream << "  },\n";
       stream << "  \"runtime\": {\n";
       stream << "    \"mode\": \"development\",\n";
       stream << "    \"permissions\": \"strict\"\n";
@@ -121,7 +127,9 @@ namespace kordex::cli
     {
       ::std::ostringstream stream;
 
-      stream << "console.log(\"Hello from " << options.name << "\");\n";
+      stream << "const appName = \"" << options.name << "\";\n";
+      stream << "\n";
+      stream << "export default \"Hello from \" + appName;\n";
 
       return stream.str();
     }
@@ -133,9 +141,20 @@ namespace kordex::cli
 
       stream << "# " << options.name << "\n\n";
       stream << "Kordex application.\n\n";
+
       stream << "## Run\n\n";
       stream << "```sh\n";
-      stream << "kordex run src/main.js\n";
+      stream << "kordex run\n";
+      stream << "```\n\n";
+
+      stream << "## Build\n\n";
+      stream << "```sh\n";
+      stream << "kordex build\n";
+      stream << "```\n\n";
+
+      stream << "## Run build output\n\n";
+      stream << "```sh\n";
+      stream << "kordex run dist/main.js\n";
       stream << "```\n";
 
       return stream.str();

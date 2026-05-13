@@ -306,6 +306,20 @@ namespace kordex::cli
       return discovery.resolve_entry();
     }
 
+    [[nodiscard]] bool has_project_manifest(
+        const ::std::filesystem::path &directory)
+    {
+      try
+      {
+        return ::std::filesystem::exists(directory / "kordex.json") ||
+               ::std::filesystem::exists(directory / "package.json");
+      }
+      catch (...)
+      {
+        return false;
+      }
+    }
+
     [[nodiscard]] Result<::std::string> resolve_entry(
         const BuildCommandOptions &options)
     {
@@ -664,6 +678,20 @@ namespace kordex::cli
           "unexpected build argument: " + arg);
     }
 
+    if (!options.has_input())
+    {
+      const ::std::filesystem::path working_directory =
+          context.config.working_directory.empty()
+              ? ::std::filesystem::current_path()
+              : ::std::filesystem::path(context.config.working_directory);
+
+      if (has_project_manifest(working_directory))
+      {
+        options.input = ".";
+        options.kind = BuildKind::Project;
+      }
+    }
+
     const auto validation = validate_build_options(options);
     if (validation)
     {
@@ -672,7 +700,6 @@ namespace kordex::cli
 
     return options;
   }
-
   Error validate_build_options(
       const BuildCommandOptions &options)
   {
@@ -857,7 +884,7 @@ namespace kordex::cli
     info.description =
         "Analyze imports, bundle modules, and generate a runnable JavaScript output file.";
     info.usage =
-        "kordex build <file|project> [--project] [--out-dir dist] [--out-file main.js] [--minify] [--force]";
+        "kordex build [file|project] [--project] [--out-dir dist] [--out-file main.js] [--minify] [--force]";
     info.hidden = false;
     info.enabled = true;
 
