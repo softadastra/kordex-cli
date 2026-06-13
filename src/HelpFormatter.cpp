@@ -279,6 +279,13 @@ namespace kordex::cli
     stream << "      --no-color   Disable colored output\n";
     stream << "      --dry-run    Show what would happen without executing\n";
 
+    stream << "\nRuntime permissions:\n";
+    stream << "      --allow-fs          Allow filesystem access for run/repl\n";
+    stream << "      --allow-env         Allow environment access for run/repl\n";
+    stream << "      --allow-net         Allow network access for run/repl\n";
+    stream << "      --allow-process     Allow process access for run/repl\n";
+    stream << "      --allow-softadastra Allow Softadastra SDK access for run/repl\n";
+
     return stream.str();
   }
 
@@ -289,8 +296,10 @@ namespace kordex::cli
     stream << "Examples:\n";
     stream << "  " << options_.executable_name << " init app\n";
     stream << "  " << options_.executable_name << " run main.js\n";
+    stream << "  " << options_.executable_name << " run main.js --allow-softadastra\n";
     stream << "  " << options_.executable_name << " run\n";
     stream << "  " << options_.executable_name << " repl --eval \"1 + 2\"\n";
+    stream << "  " << options_.executable_name << " repl --eval \"1 + 2\" --allow-softadastra\n";
     stream << "  " << options_.executable_name << " check main.js\n";
     stream << "  " << options_.executable_name << " build main.js\n";
     stream << "  " << options_.executable_name << " build . --project --out-dir dist --force\n";

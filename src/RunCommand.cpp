@@ -350,6 +350,12 @@ namespace kordex::cli
         continue;
       }
 
+      if (arg == "--allow-softadastra")
+      {
+        options.allow_softadastra = true;
+        continue;
+      }
+
       if (arg == "--allow-net")
       {
         options.allow_net = true;
@@ -423,6 +429,7 @@ namespace kordex::cli
     runtime_options.allow_net = options.allow_net;
     runtime_options.allow_process = options.allow_process;
     runtime_options.allow_env = options.allow_env;
+    runtime_options.allow_softadastra = options.allow_softadastra;
 
     runtime_options.diagnostics = options.diagnostics;
     runtime_options.debug = options.debug || config.debug;
@@ -509,7 +516,10 @@ namespace kordex::cli
     info.summary = "Run a JavaScript or TypeScript file";
     info.description =
         "Run a JavaScript or TypeScript source file through the Kordex bindings engine.";
-    info.usage = "kordex run <file> [--] [args]";
+    info.usage =
+        "kordex run <file> [args...] "
+        "[--allow-fs] [--allow-env] [--allow-net] "
+        "[--allow-process] [--allow-softadastra]";
     info.hidden = false;
     info.enabled = true;
 

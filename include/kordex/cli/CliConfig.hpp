@@ -76,6 +76,8 @@ namespace kordex::cli
     bool enable_check{true};
     bool enable_build{true};
     bool enable_repl{true};
+    bool enable_install{true};
+    bool enable_update{true};
     bool enable_version{true};
 
     /**

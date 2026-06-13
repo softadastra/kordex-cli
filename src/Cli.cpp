@@ -82,6 +82,8 @@ namespace kordex::cli
     options.enable_check = config_.enable_check;
     options.enable_build = config_.enable_build;
     options.enable_repl = config_.enable_repl;
+    options.enable_install = config_.enable_install;
+    options.enable_update = config_.enable_update;
     options.enable_version = config_.enable_version;
 
     parser_ = ArgumentParser(options);

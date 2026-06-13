@@ -72,6 +72,11 @@ namespace kordex::cli
     bool allow_env{false};
 
     /**
+     * @brief Whether Softadastra SDK access is allowed.
+     */
+    bool allow_softadastra{false};
+
+    /**
      * @brief Whether interactive mode is requested.
      */
     bool interactive{true};

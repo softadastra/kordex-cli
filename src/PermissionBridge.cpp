@@ -45,6 +45,7 @@ namespace kordex::cli
     base.enable_env = config.allow_env;
     base.enable_process = config.allow_process;
     base.enable_http = config.allow_net;
+    base.enable_softadastra = config.allow_softadastra;
 
     /*
      * Native module/function creation must remain aligned with the runtime

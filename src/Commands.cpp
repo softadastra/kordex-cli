@@ -75,6 +75,14 @@ namespace kordex::cli
         {
           stream << "  repl     Start an interactive Kordex session\n";
         }
+        else if (name == "install")
+        {
+          stream << "  install  Install project dependencies\n";
+        }
+        else if (name == "update")
+        {
+          stream << "  update   Update project dependencies\n";
+        }
         else if (name == "version")
         {
           stream << "  version  Show Kordex version\n";
@@ -157,6 +165,8 @@ namespace kordex::cli
            name == "check" ||
            name == "build" ||
            name == "repl" ||
+           name == "install" ||
+           name == "update" ||
            name == "version" ||
            name == "--version" ||
            name == "-V";

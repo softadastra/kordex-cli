@@ -223,6 +223,12 @@ namespace kordex::cli
         continue;
       }
 
+      if (arg == "--allow-softadastra")
+      {
+        options.allow_softadastra = true;
+        continue;
+      }
+
       if (arg == "--allow-net")
       {
         options.allow_net = true;
@@ -313,6 +319,7 @@ namespace kordex::cli
     runtime_options.allow_net = options.allow_net;
     runtime_options.allow_process = options.allow_process;
     runtime_options.allow_env = options.allow_env;
+    runtime_options.allow_softadastra = options.allow_softadastra;
 
     runtime_options.diagnostics = options.diagnostics;
     runtime_options.debug = options.debug || config.debug;
@@ -458,7 +465,10 @@ namespace kordex::cli
     info.summary = "Start an interactive Kordex session";
     info.description =
         "Start a Kordex REPL session or evaluate a source snippet with --eval.";
-    info.usage = "kordex repl [--eval <source>]";
+    info.usage =
+        "kordex repl [--eval <source>] "
+        "[--allow-fs] [--allow-env] [--allow-net] "
+        "[--allow-process] [--allow-softadastra]";
     info.hidden = false;
     info.enabled = true;
 

@@ -79,6 +79,8 @@ namespace kordex::cli
     config.enable_check = options.enable_check;
     config.enable_build = options.enable_build;
     config.enable_repl = options.enable_repl;
+    config.enable_install = options.enable_install;
+    config.enable_update = options.enable_update;
     config.enable_version = options.enable_version;
 
     const auto validation = config.validate();
@@ -145,6 +147,8 @@ namespace kordex::cli
            enable_check ||
            enable_build ||
            enable_repl ||
+           enable_install ||
+           enable_update ||
            enable_version;
   }
 
@@ -179,6 +183,16 @@ namespace kordex::cli
     if (name == "repl")
     {
       return enable_repl;
+    }
+
+    if (name == "install")
+    {
+      return enable_install;
+    }
+
+    if (name == "update")
+    {
+      return enable_update;
     }
 
     if (name == "version" ||
@@ -221,6 +235,16 @@ namespace kordex::cli
     }
 
     if (enable_repl)
+    {
+      ++count;
+    }
+
+    if (enable_install)
+    {
+      ++count;
+    }
+
+    if (enable_update)
     {
       ++count;
     }

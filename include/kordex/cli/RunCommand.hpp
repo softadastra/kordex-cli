@@ -77,6 +77,11 @@ namespace kordex::cli
     bool allow_env{false};
 
     /**
+     * @brief Whether Softadastra SDK access is allowed.
+     */
+    bool allow_softadastra{false};
+
+    /**
      * @brief Return true if a source file was provided.
      */
     [[nodiscard]] bool has_file() const noexcept;
