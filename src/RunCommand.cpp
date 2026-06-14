@@ -115,7 +115,7 @@ namespace kordex::cli
     }
 
     [[nodiscard]] ::std::string format_script_success(
-        const ::std::string &file,
+        const ::std::string &,
         const kordex::bindings::ScriptResult &result)
     {
       if (!result.output.empty())
@@ -128,10 +128,7 @@ namespace kordex::cli
         return result.value.display();
       }
 
-      ::std::ostringstream stream;
-      stream << "Ran " << file;
-
-      return stream.str();
+      return "";
     }
 
     [[nodiscard]] ::std::string format_script_failure(
