@@ -1,31 +1,37 @@
 {
   "dependencies": [
     {
-      "commit": "0c90d5ce58b85671caf8ca7b3c15f61375bc416a",
-      "hash": "5f92c513691010a026b5e303974c84d0112112da454ea441031a5eafa081bffe",
-      "id": "softadastra/kordex-bindings",
-      "repo": "https://github.com/softadastra/kordex-bindings",
-      "requested": "0.2.0",
-      "tag": "v0.2.0",
-      "version": "0.2.0"
+      "commit": "4c6f56b1b8567cb01718f9dd5339f57e77257c1b",
+      "hash": "3f7d4cef43a1fbdb5ead58d3e8f8ccc16f50e99bf95b35c044fb0cb30538a472",
+      "hash_algorithm": "vix-package-sha256",
+      "hash_version": 2,
+      "id": "kordexjs/bindings",
+      "repo": "https://github.com/kordexjs/bindings",
+      "requested": "0.3.1",
+      "tag": "v0.3.1",
+      "version": "0.3.1"
     },
     {
-      "commit": "d827815bf00bff8db79aaef8f37d9d584ac9dc4c",
-      "hash": "d6a7f5e602f9616662c6b6e8cff2f56608952e9bd235d4bee7d548993c5e1e20",
-      "id": "softadastra/kordex-runtime",
-      "repo": "https://github.com/softadastra/kordex-runtime",
-      "requested": "0.2.0",
-      "tag": "v0.2.0",
-      "version": "0.2.0"
+      "commit": "6dd0a455d3283d8d273d1d9d8c46c3834ebfb8c5",
+      "hash": "75336d458a30f6aa77abfb4c4b8d8f420dce3f5ef25144e9e32ad49b22586c64",
+      "hash_algorithm": "vix-package-sha256",
+      "hash_version": 2,
+      "id": "kordexjs/runtime",
+      "repo": "https://github.com/kordexjs/runtime",
+      "requested": "0.3.0",
+      "tag": "v0.3.0",
+      "version": "0.3.0"
     },
     {
-      "commit": "d65e605164c4fc936cb8e270a87edd7bc6232b2a",
-      "hash": "a684b96e08ada014ae45c6faaa03f6e2b7664b847224c6fe65d561114a69d704",
-      "id": "softadastra/kordex-std",
-      "repo": "https://github.com/softadastra/kordex-std",
-      "requested": "0.2.0",
-      "tag": "v0.2.0",
-      "version": "0.2.0"
+      "commit": "74861f779afd81acfcc2a3534581b9c978c90c49",
+      "hash": "020a7a52a4b4665d02b2a3013799176ea00fa3a342046f2d6b66dd348bce4505",
+      "hash_algorithm": "vix-package-sha256",
+      "hash_version": 2,
+      "id": "kordexjs/std",
+      "repo": "https://github.com/kordexjs/std",
+      "requested": "0.3.0",
+      "tag": "v0.3.0",
+      "version": "0.3.0"
     }
   ],
   "lockVersion": 1

@@ -1,14 +1,18 @@
 {
   "authors": [
     {
-      "github": "softadastra",
-      "name": "Softadastra"
+      "github": "kordexjs",
+      "name": "KordexJS"
+    },
+    {
+      "github": "GaspardKirira",
+      "name": "Gaspard Kirira"
     }
   ],
   "deps": [
     {
-      "id": "softadastra/kordex-std",
-      "version": "0.2.0"
+      "id": "kordexjs/std",
+      "version": "0.3.0"
     }
   ],
   "description": "Official command line interface for Kordex, providing commands to initialize, run, check, build, and interact with reliable local-first JavaScript applications.",
@@ -20,13 +24,13 @@
     "developer-tools",
     "local-first",
     "kordex",
-    "softadastra",
+    "kordexjs",
     "vix"
   ],
   "license": "MIT",
-  "name": "kordex-cli",
-  "namespace": "softadastra",
-  "repository": "https://github.com/softadastra/kordex-cli",
+  "name": "cli",
+  "namespace": "kordexjs",
+  "repository": "https://github.com/kordexjs/cli",
   "type": "library",
-  "version": "0.2.0"
+  "version": "0.3.0"
 }
