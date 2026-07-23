@@ -48,14 +48,14 @@ namespace
 
   [[nodiscard]] bool test_version_string()
   {
-    constexpr std::string_view expected = "0.1.0";
+    constexpr std::string_view expected = "0.3.0";
 
     return expect_true(
                kordex::cli::version() == expected,
-               "version string should be 0.1.0") &&
+               "version string should be 0.3.0") &&
            expect_true(
                kordex::cli::version_string == expected,
-               "version constant should be 0.1.0");
+               "version constant should be 0.3.0");
   }
 
   [[nodiscard]] bool test_version_constants()

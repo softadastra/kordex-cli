@@ -31,7 +31,7 @@ namespace kordex::cli
   /**
    * @brief Kordex CLI version as a stable string.
    */
-  inline constexpr std::string_view version_string = "0.1.0";
+  inline constexpr std::string_view version_string = "0.3.0";
 
   /**
    * @brief Return the Kordex CLI major version.
